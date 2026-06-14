@@ -45,7 +45,7 @@ const searchImages = async (
   });
 
   const searchRes = await searchSearxng(res.query, {
-    engines: ['bing images', 'google images'],
+    engines: ['bing images'],
   });
 
   const images: ImageSearchResult[] = [];

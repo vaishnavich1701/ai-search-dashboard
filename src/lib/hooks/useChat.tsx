@@ -19,6 +19,19 @@ import { getAutoMediaSearch } from '../config/clientRegistry';
 import { applyPatch } from 'rfc6902';
 import { Widget } from '@/components/ChatWindow';
 
+const getErrorMessage = async (res: Response) => {
+  try {
+    const data = await res.json();
+    return (
+      data?.error?.message ||
+      data?.message ||
+      `Request failed with status ${res.status}`
+    );
+  } catch {
+    return `Request failed with status ${res.status}`;
+  }
+};
+
 export type Section = {
   message: Message;
   widgets: Widget[];
@@ -425,6 +438,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           method: 'POST',
         });
 
+        if (!res.ok) throw new Error(await getErrorMessage(res));
+
         if (!res.body) throw new Error('No response body');
 
         const reader = res.body?.getReader();
@@ -552,12 +567,30 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
     return async (data: any) => {
       if (data.type === 'error') {
-        toast.error(data.data);
+        const errorMessage =
+          typeof data.data === 'string'
+            ? data.data
+            : data.data?.message ||
+              'An error occurred while processing chat request';
+        toast.error(errorMessage);
         setLoading(false);
         setMessages((prev) =>
           prev.map((msg) =>
             msg.messageId === messageId
-              ? { ...msg, status: 'error' as const }
+              ? {
+                  ...msg,
+                  status: 'error' as const,
+                  responseBlocks:
+                    msg.responseBlocks.length > 0
+                      ? msg.responseBlocks
+                      : [
+                          {
+                            id: crypto.randomBytes(7).toString('hex'),
+                            type: 'text' as const,
+                            data: errorMessage,
+                          },
+                        ],
+                }
               : msg,
           ),
         );
@@ -775,6 +808,30 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         systemInstructions: localStorage.getItem('systemInstructions'),
       }),
     });
+
+    if (!res.ok) {
+      const errorMessage = await getErrorMessage(res);
+      toast.error(errorMessage);
+      setLoading(false);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.messageId === messageId
+            ? {
+                ...msg,
+                status: 'error' as const,
+                responseBlocks: [
+                  {
+                    id: crypto.randomBytes(7).toString('hex'),
+                    type: 'text' as const,
+                    data: errorMessage,
+                  },
+                ],
+              }
+            : msg,
+        ),
+      );
+      return;
+    }
 
     if (!res.body) throw new Error('No response body');
 

@@ -2,6 +2,16 @@ import searchImages from '@/lib/agents/media/image';
 import ModelRegistry from '@/lib/models/registry';
 import { ModelWithProvider } from '@/lib/models/types';
 
+const getMediaSearchErrorMessage = (err: unknown) => {
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (message.toLowerCase().includes('rate limit')) {
+    return `Rate limit reached for the selected model/provider. Please try again in a few seconds or choose another model. Details: ${message}`;
+  }
+
+  return message || 'An error occurred while searching media';
+};
+
 interface ImageSearchBody {
   query: string;
   chatHistory: any[];
@@ -32,9 +42,10 @@ export const POST = async (req: Request) => {
 
     return Response.json({ images }, { status: 200 });
   } catch (err) {
+    const message = getMediaSearchErrorMessage(err);
     console.error(`An error occurred while searching images: ${err}`);
     return Response.json(
-      { message: 'An error occurred while searching images' },
+      { message, error: { code: 'MEDIA_SEARCH_FAILED', message } },
       { status: 500 },
     );
   }

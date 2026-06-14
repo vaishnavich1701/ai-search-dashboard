@@ -24,6 +24,7 @@ const SearchImages = ({
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [slides, setSlides] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <>
@@ -32,39 +33,57 @@ const SearchImages = ({
           id={`search-images-${messageId}`}
           onClick={async () => {
             setLoading(true);
+            setError(null);
 
             const chatModelProvider = localStorage.getItem(
               'chatModelProviderId',
             );
             const chatModel = localStorage.getItem('chatModelKey');
 
-            const res = await fetch(`/api/images`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                query: query,
-                chatHistory: chatHistory,
-                chatModel: {
-                  providerId: chatModelProvider,
-                  key: chatModel,
+            try {
+              const res = await fetch(`/api/images`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
                 },
-              }),
-            });
+                body: JSON.stringify({
+                  query: query,
+                  chatHistory: chatHistory,
+                  chatModel: {
+                    providerId: chatModelProvider,
+                    key: chatModel,
+                  },
+                }),
+              });
 
-            const data = await res.json();
+              const data = await res.json();
 
-            const images = data.images ?? [];
-            setImages(images);
-            setSlides(
-              images.map((image: Image) => {
-                return {
-                  src: image.img_src,
-                };
-              }),
-            );
-            setLoading(false);
+              if (!res.ok) {
+                throw new Error(
+                  data?.error?.message ||
+                    data?.message ||
+                    'An error occurred while searching images',
+                );
+              }
+
+              const images = data.images ?? [];
+              setImages(images);
+              setSlides(
+                images.map((image: Image) => {
+                  return {
+                    src: image.img_src,
+                  };
+                }),
+              );
+            } catch (err) {
+              setError(
+                err instanceof Error
+                  ? err.message
+                  : 'An error occurred while searching images',
+              );
+            } finally {
+              setLoading(false);
+            }
           }}
           className="border border-dashed border-light-200 dark:border-dark-200 hover:bg-light-200 dark:hover:bg-dark-200 active:scale-95 duration-200 transition px-4 py-2 flex flex-row items-center justify-between rounded-lg dark:text-white text-sm w-full"
         >
@@ -74,6 +93,11 @@ const SearchImages = ({
           </div>
           <PlusIcon className="text-[#24A0ED]" size={17} />
         </button>
+      )}
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-200">
+          {error}
+        </div>
       )}
       {loading && (
         <div className="grid grid-cols-2 gap-2">

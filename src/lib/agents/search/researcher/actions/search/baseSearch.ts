@@ -1,13 +1,37 @@
 import BaseEmbedding from '@/lib/models/base/embedding';
 import BaseLLM from '@/lib/models/base/llm';
-import { searchSearxng, SearxngSearchOptions } from '@/lib/searxng';
+import {
+  searchSearxng,
+  SearxngSearchOptions,
+  SearxngUnavailableError,
+} from '@/lib/searxng';
 import SessionManager from '@/lib/session';
-import { Chunk, ResearchBlock, SearchResultsResearchBlock } from '@/lib/types';
+import {
+  Chunk,
+  ResearchBlock,
+  SearchResultsResearchBlock,
+  TextBlock,
+} from '@/lib/types';
 import { SearchAgentConfig } from '../../../types';
 import computeSimilarity from '@/lib/utils/computeSimilarity';
 import z from 'zod';
 import Scraper from '@/lib/scraper';
 import { splitText } from '@/lib/utils/splitText';
+
+const SEARCH_UNAVAILABLE_MESSAGE =
+  'Search is temporarily unavailable. Please retry in a few seconds. If it still does not work, refresh the page and try again.';
+
+const emitSearchUnavailable = (input: {
+  session: InstanceType<typeof SessionManager>;
+}) => {
+  const block: TextBlock = {
+    id: crypto.randomUUID(),
+    type: 'text',
+    data: SEARCH_UNAVAILABLE_MESSAGE,
+  };
+
+  input.session.emitBlock(block);
+};
 
 export const executeSearch = async (input: {
   queries: string[];
@@ -125,7 +149,15 @@ export const executeSearch = async (input: {
       }
     };
 
-    await Promise.all(input.queries.map(search));
+    try {
+      await Promise.all(input.queries.map(search));
+    } catch (err) {
+      if (err instanceof SearxngUnavailableError) {
+        emitSearchUnavailable(input);
+        return [];
+      }
+      throw err;
+    }
 
     results.sort((a, b) => b.metadata.similarity - a.metadata.similarity);
 
@@ -235,7 +267,15 @@ export const executeSearch = async (input: {
       }
     };
 
-    await Promise.all(input.queries.map(search));
+    try {
+      await Promise.all(input.queries.map(search));
+    } catch (err) {
+      if (err instanceof SearxngUnavailableError) {
+        emitSearchUnavailable(input);
+        return [];
+      }
+      throw err;
+    }
 
     const pickerPrompt = `
       Assistant is an AI search result picker. Assistant's task is to pick 2-3 of the most relevant search results based off the query which can be then scraped for information to answer the query.

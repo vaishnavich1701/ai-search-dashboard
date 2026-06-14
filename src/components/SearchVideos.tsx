@@ -38,6 +38,7 @@ const Searchvideos = ({
   const [open, setOpen] = useState(false);
   const [slides, setSlides] = useState<VideoSlide[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const videoRefs = useRef<(HTMLIFrameElement | null)[]>([]);
 
   return (
@@ -47,41 +48,59 @@ const Searchvideos = ({
           id={`search-videos-${messageId}`}
           onClick={async () => {
             setLoading(true);
+            setError(null);
 
             const chatModelProvider = localStorage.getItem(
               'chatModelProviderId',
             );
             const chatModel = localStorage.getItem('chatModelKey');
 
-            const res = await fetch(`/api/videos`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                query: query,
-                chatHistory: chatHistory,
-                chatModel: {
-                  providerId: chatModelProvider,
-                  key: chatModel,
+            try {
+              const res = await fetch(`/api/videos`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
                 },
-              }),
-            });
+                body: JSON.stringify({
+                  query: query,
+                  chatHistory: chatHistory,
+                  chatModel: {
+                    providerId: chatModelProvider,
+                    key: chatModel,
+                  },
+                }),
+              });
 
-            const data = await res.json();
+              const data = await res.json();
 
-            const videos = data.videos ?? [];
-            setVideos(videos);
-            setSlides(
-              videos.map((video: Video) => {
-                return {
-                  type: 'video-slide',
-                  iframe_src: video.iframe_src,
-                  src: video.img_src,
-                };
-              }),
-            );
-            setLoading(false);
+              if (!res.ok) {
+                throw new Error(
+                  data?.error?.message ||
+                    data?.message ||
+                    'An error occurred while searching videos',
+                );
+              }
+
+              const videos = data.videos ?? [];
+              setVideos(videos);
+              setSlides(
+                videos.map((video: Video) => {
+                  return {
+                    type: 'video-slide',
+                    iframe_src: video.iframe_src,
+                    src: video.img_src,
+                  };
+                }),
+              );
+            } catch (err) {
+              setError(
+                err instanceof Error
+                  ? err.message
+                  : 'An error occurred while searching videos',
+              );
+            } finally {
+              setLoading(false);
+            }
           }}
           className="border border-dashed border-light-200 dark:border-dark-200 hover:bg-light-200 dark:hover:bg-dark-200 active:scale-95 duration-200 transition px-4 py-2 flex flex-row items-center justify-between rounded-lg dark:text-white text-sm w-full"
         >
@@ -91,6 +110,11 @@ const Searchvideos = ({
           </div>
           <PlusIcon className="text-[#24A0ED]" size={17} />
         </button>
+      )}
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-200">
+          {error}
+        </div>
       )}
       {loading && (
         <div className="grid grid-cols-2 gap-2">

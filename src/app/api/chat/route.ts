@@ -6,8 +6,8 @@ import SessionManager from '@/lib/session';
 import { ChatTurnMessage } from '@/lib/types';
 import { SearchSources } from '@/lib/agents/search/types';
 import db from '@/lib/db';
-import { eq } from 'drizzle-orm';
-import { chats } from '@/lib/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { chats, messages } from '@/lib/db/schema';
 import UploadManager from '@/lib/uploads/manager';
 
 export const runtime = 'nodejs';
@@ -48,6 +48,33 @@ const bodySchema = z.object({
 });
 
 type Body = z.infer<typeof bodySchema>;
+
+const normalizeProviderError = (err: unknown) => {
+  const rawMessage = err instanceof Error ? err.message : String(err);
+  const message =
+    rawMessage || 'An error occurred while processing chat request';
+  const lower = message.toLowerCase();
+
+  if (
+    lower.includes('only supports chat') ||
+    lower.includes('unsupported model') ||
+    lower.includes('model not compatible') ||
+    lower.includes('does not support chat') ||
+    lower.includes('provider does not support')
+  ) {
+    return {
+      code: 'MODEL_UNSUPPORTED',
+      message:
+        'This model only supports Chat Completions. Please select a supported chat model or update your provider settings.',
+      details: message,
+    };
+  }
+
+  return {
+    code: 'CHAT_REQUEST_FAILED',
+    message,
+  };
+};
 
 const safeValidateBody = (data: unknown) => {
   const result = bodySchema.safeParse(data);
@@ -210,20 +237,43 @@ export const POST = async (req: Request) => {
       }
     });
 
-    agent.searchAsync(session, {
-      chatHistory: history,
-      followUp: message.content,
-      chatId: body.message.chatId,
-      messageId: body.message.messageId,
-      config: {
-        llm,
-        embedding: embedding,
-        sources: body.sources as SearchSources[],
-        mode: body.optimizationMode,
-        fileIds: body.files,
-        systemInstructions: body.systemInstructions || 'None',
-      },
-    });
+    agent
+      .searchAsync(session, {
+        chatHistory: history,
+        followUp: message.content,
+        chatId: body.message.chatId,
+        messageId: body.message.messageId,
+        config: {
+          llm,
+          embedding: embedding,
+          sources: body.sources as SearchSources[],
+          mode: body.optimizationMode,
+          fileIds: body.files,
+          systemInstructions: body.systemInstructions || 'None',
+        },
+      })
+      .catch(async (err) => {
+        const providerError = normalizeProviderError(err);
+        console.error('Search agent failed:', err);
+        session.emit('error', {
+          data: providerError.message,
+          error: providerError,
+        });
+
+        await db
+          .update(messages)
+          .set({ status: 'error' })
+          .where(
+            and(
+              eq(messages.chatId, body.message.chatId),
+              eq(messages.messageId, body.message.messageId),
+            ),
+          )
+          .execute()
+          .catch((updateErr) => {
+            console.error('Failed to mark errored message:', updateErr);
+          });
+      });
 
     ensureChatExists({
       id: body.message.chatId,
@@ -245,10 +295,11 @@ export const POST = async (req: Request) => {
       },
     });
   } catch (err) {
+    const providerError = normalizeProviderError(err);
     console.error('An error occurred while processing chat request:', err);
     return Response.json(
-      { message: 'An error occurred while processing chat request' },
-      { status: 500 },
+      { message: providerError.message, error: providerError },
+      { status: providerError.code === 'MODEL_UNSUPPORTED' ? 400 : 500 },
     );
   }
 };

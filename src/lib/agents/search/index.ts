@@ -100,7 +100,7 @@ class SearchAgent {
     });
 
     let finalContext =
-      '<Query to be answered without searching; Search not made>';
+      '<Search not made because the query was classified as answerable without web results. Answer from general knowledge and do not use the no-results fallback solely because search was skipped.>';
 
     if (searchResults && searchResults.searchFindings.length > 0) {
       finalContext = searchResults.searchFindings

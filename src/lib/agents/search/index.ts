@@ -102,12 +102,18 @@ class SearchAgent {
     let finalContext =
       '<Query to be answered without searching; Search not made>';
 
-    if (searchResults) {
-      finalContext = searchResults?.searchFindings
-        .map(
-          (f, index) =>
-            `<result index=${index + 1} title=${f.metadata.title}>${f.content}</result>`,
-        )
+    if (searchResults && searchResults.searchFindings.length > 0) {
+      finalContext = searchResults.searchFindings
+        .map((f, index) => {
+          const source = {
+            index: index + 1,
+            title: f.metadata.title,
+            url: f.metadata.url,
+            content: f.content,
+          };
+
+          return `<result>${JSON.stringify(source)}</result>`;
+        })
         .join('\n');
     }
 

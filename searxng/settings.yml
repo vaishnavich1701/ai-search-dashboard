@@ -16,3 +16,9 @@ server:
 engines:
   - name: wolframalpha
     disabled: false
+  - name: google images
+    disabled: true
+  - name: ahmia
+    disabled: true
+  - name: torch
+    disabled: true

@@ -11,5 +11,10 @@ export const getConfiguredModelProviderById = (
   return getConfiguredModelProviders().find((p) => p.id === id) ?? undefined;
 };
 
-export const getSearxngURL = () =>
-  configManager.getConfig('search.searxngURL', '');
+export const getSearxngURL = () => {
+  const configuredURL = configManager.getConfig('search.searxngURL', '');
+  const url =
+    process.env.SEARXNG_API_URL || configuredURL || 'http://localhost:8080';
+
+  return url.replace(/\/+$/, '');
+};

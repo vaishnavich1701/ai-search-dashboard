@@ -52,13 +52,25 @@ class APISearchAgent {
       type: 'researchComplete',
     });
 
-    const finalContext =
-      searchResults?.searchFindings
-        .map(
-          (f, index) =>
-            `<result index=${index + 1} title=${f.metadata.title}>${f.content}</result>`,
-        )
-        .join('\n') || '';
+    const searchWasAttempted = searchPromise !== null;
+    let finalContext = searchWasAttempted
+      ? '<Search was attempted but returned no usable text results. Do not answer from stale general knowledge for current/source-backed questions; use the no-results fallback instead.>'
+      : '<Search not made because the query was classified as answerable without web results. Answer from general knowledge and do not use the no-results fallback solely because search was skipped.>';
+
+    if (searchResults && searchResults.searchFindings.length > 0) {
+      finalContext = searchResults.searchFindings
+        .map((f, index) => {
+          const source = {
+            index: index + 1,
+            title: f.metadata.title,
+            url: f.metadata.url,
+            content: f.content,
+          };
+
+          return `<result>${JSON.stringify(source)}</result>`;
+        })
+        .join('\n');
+    }
 
     const widgetContext = widgetOutputs
       .map((o) => {

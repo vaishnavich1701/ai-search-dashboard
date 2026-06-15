@@ -3,6 +3,8 @@ import { ResearchAction } from '../../../types';
 import { ResearchBlock } from '@/lib/types';
 import { executeSearch } from './baseSearch';
 
+const DEFAULT_WEB_SEARCH_ENGINES = ['bing', 'wikipedia'];
+
 const actionSchema = z.object({
   type: z.literal('web_search'),
   queries: z
@@ -102,6 +104,9 @@ const webSearchAction: ResearchAction<typeof actionSchema> = {
       queries: input.queries,
       researchBlock: researchBlock,
       session: additionalConfig.session,
+      searchConfig: {
+        engines: DEFAULT_WEB_SEARCH_ENGINES,
+      },
     });
 
     return {

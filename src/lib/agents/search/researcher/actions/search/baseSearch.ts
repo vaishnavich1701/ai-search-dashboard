@@ -155,14 +155,28 @@ export const executeSearch = async (input: {
       }
     };
 
-    try {
-      await Promise.all(input.queries.map(search));
-    } catch (err) {
-      if (err instanceof SearxngUnavailableError) {
+    const searchSettledResults = await Promise.allSettled(
+      input.queries.map(search),
+    );
+    const searchErrors = searchSettledResults.filter(
+      (result) => result.status === 'rejected',
+    );
+
+    if (searchErrors.length === searchSettledResults.length) {
+      const firstError = searchErrors[0]?.reason;
+
+      if (firstError instanceof SearxngUnavailableError) {
         emitSearchUnavailable(input);
         return [];
       }
-      throw err;
+
+      if (firstError) {
+        throw firstError;
+      }
+    } else if (searchErrors.length > 0) {
+      console.warn(
+        `Some SearXNG queries failed (${searchErrors.length}/${searchSettledResults.length}); continuing with available results.`,
+      );
     }
 
     results.sort((a, b) => b.metadata.similarity - a.metadata.similarity);
@@ -273,14 +287,28 @@ export const executeSearch = async (input: {
       }
     };
 
-    try {
-      await Promise.all(input.queries.map(search));
-    } catch (err) {
-      if (err instanceof SearxngUnavailableError) {
+    const searchSettledResults = await Promise.allSettled(
+      input.queries.map(search),
+    );
+    const searchErrors = searchSettledResults.filter(
+      (result) => result.status === 'rejected',
+    );
+
+    if (searchErrors.length === searchSettledResults.length) {
+      const firstError = searchErrors[0]?.reason;
+
+      if (firstError instanceof SearxngUnavailableError) {
         emitSearchUnavailable(input);
         return [];
       }
-      throw err;
+
+      if (firstError) {
+        throw firstError;
+      }
+    } else if (searchErrors.length > 0) {
+      console.warn(
+        `Some SearXNG queries failed (${searchErrors.length}/${searchSettledResults.length}); continuing with available results.`,
+      );
     }
 
     const pickerPrompt = `

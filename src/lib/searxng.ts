@@ -29,6 +29,17 @@ export class SearxngUnavailableError extends Error {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const getSearxngRequestHeaders = (url: URL): HeadersInit => {
+  if (['localhost', '127.0.0.1', '::1'].includes(url.hostname)) {
+    return {
+      'X-Forwarded-For': '127.0.0.1',
+      'X-Real-IP': '127.0.0.1',
+    };
+  }
+
+  return {};
+};
+
 export const searchSearxng = async (
   query: string,
   opts?: SearxngSearchOptions,
@@ -59,6 +70,7 @@ export const searchSearxng = async (
 
     try {
       const res = await fetch(url, {
+        headers: getSearxngRequestHeaders(url),
         signal: controller.signal,
       });
 

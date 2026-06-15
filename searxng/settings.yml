@@ -5,6 +5,7 @@ general:
 
 search:
   autocomplete: 'google'
+  default_lang: 'en-US'
   formats:
     - html
     - json

@@ -3,7 +3,7 @@ import { ResearchAction } from '../../../types';
 import { ResearchBlock } from '@/lib/types';
 import { executeSearch } from './baseSearch';
 
-const DEFAULT_WEB_SEARCH_ENGINES = ['duckduckgo', 'bing', 'wikipedia'];
+const DEFAULT_WEB_SEARCH_ENGINES = ['bing', 'wikipedia'];
 
 const actionSchema = z.object({
   type: z.literal('web_search'),

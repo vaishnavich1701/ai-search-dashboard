@@ -18,6 +18,8 @@ engines:
     disabled: false
   - name: brave
     disabled: true
+  - name: duckduckgo
+    disabled: true
   - name: google images
     disabled: true
   - name: ahmia

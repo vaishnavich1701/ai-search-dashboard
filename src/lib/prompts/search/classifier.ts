@@ -11,6 +11,9 @@ NOTE: BY GENERAL KNOWLEDGE WE MEAN INFORMATION THAT IS OBVIOUS, WIDELY KNOWN, OR
    - Set it to true for writing tasks or greeting messages that do not require external information.
    - Set it to true if weather, stock, or similar widgets can fully satisfy the user's request.
    - Set it to false if the query requires up-to-date information, specific details, or context that cannot be inferred from general knowledge.
+   - Set it to false for current or recent events, ongoing conflicts, wars, elections, disasters, lawsuits, product releases, prices, sports, or anything whose status may have changed.
+   - Set it to false when the user asks whether a recent event "ended", "started", "happened", "changed", "is still ongoing", or asks for "latest", "today", "now", or similar time-sensitive wording.
+   - Example: "Did the US Iran war end?" must have skipSearch=false because the answer depends on current conflict/news status.
    - ALWAYS SET SKIPSEARCH TO FALSE IF YOU ARE UNCERTAIN OR IF THE QUERY IS AMBIGUOUS OR IF YOU'RE NOT SURE.
 2. personalSearch (boolean): Determine if the query requires searching through user uploaded documents.
    - Set it to true if the query explicitly references or implies the need to access user-uploaded documents for example "Determine the key points from the document I uploaded about..." or "Who is the author?", "Summarize the content of the document"

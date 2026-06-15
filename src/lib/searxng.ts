@@ -45,7 +45,9 @@ export const searchSearxng = async (
         url.searchParams.append(key, value.join(','));
         return;
       }
-      url.searchParams.append(key, value as string);
+      if (value !== undefined) {
+        url.searchParams.append(key, String(value));
+      }
     });
   }
 

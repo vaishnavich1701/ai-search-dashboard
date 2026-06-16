@@ -8,10 +8,11 @@ import db from '@/lib/db';
 import { messages } from '@/lib/db/schema';
 import { and, eq, gt } from 'drizzle-orm';
 import { TextBlock } from '@/lib/types';
-import { getTokenCount } from '@/lib/utils/splitText';
+import { recordQueryAnalytics } from '@/lib/analytics';
 
 class SearchAgent {
   async searchAsync(session: SessionManager, input: SearchAgentInput) {
+    const analyticsStartedAt = input.analytics?.startedAt ?? new Date();
     const exists = await db.query.messages.findFirst({
       where: and(
         eq(messages.chatId, input.chatId),
@@ -52,148 +53,190 @@ class SearchAgent {
         .execute();
     }
 
-    const classification = await classify({
-      chatHistory: input.chatHistory,
-      enabledSources: input.config.sources,
-      query: input.followUp,
-      llm: input.config.llm,
-    });
-
-    const widgetPromise = WidgetExecutor.executeAll({
-      classification,
-      chatHistory: input.chatHistory,
-      followUp: input.followUp,
-      llm: input.config.llm,
-    }).then((widgetOutputs) => {
-      widgetOutputs.forEach((o) => {
-        session.emitBlock({
-          id: crypto.randomUUID(),
-          type: 'widget',
-          data: {
-            widgetType: o.type,
-            params: o.data,
-          },
-        });
+    try {
+      const classification = await classify({
+        chatHistory: input.chatHistory,
+        enabledSources: input.config.sources,
+        query: input.followUp,
+        llm: input.config.llm,
       });
-      return widgetOutputs;
-    });
 
-    let searchPromise: Promise<ResearcherOutput> | null = null;
-
-    if (!classification.classification.skipSearch) {
-      const researcher = new Researcher();
-      searchPromise = researcher.research(session, {
+      const widgetPromise = WidgetExecutor.executeAll({
+        classification,
         chatHistory: input.chatHistory,
         followUp: input.followUp,
-        classification: classification,
-        config: input.config,
+        llm: input.config.llm,
+      }).then((widgetOutputs) => {
+        widgetOutputs.forEach((o) => {
+          session.emitBlock({
+            id: crypto.randomUUID(),
+            type: 'widget',
+            data: {
+              widgetType: o.type,
+              params: o.data,
+            },
+          });
+        });
+        return widgetOutputs;
       });
-    }
 
-    const [widgetOutputs, searchResults] = await Promise.all([
-      widgetPromise,
-      searchPromise,
-    ]);
+      let searchPromise: Promise<ResearcherOutput> | null = null;
 
-    session.emit('data', {
-      type: 'researchComplete',
-    });
+      if (!classification.classification.skipSearch) {
+        const researcher = new Researcher();
+        searchPromise = researcher.research(session, {
+          chatHistory: input.chatHistory,
+          followUp: input.followUp,
+          classification: classification,
+          config: input.config,
+        });
+      }
 
-    const searchWasAttempted = searchPromise !== null;
-    let finalContext = searchWasAttempted
-      ? '<Search was attempted but returned no usable text results. Do not answer from stale general knowledge for current/source-backed questions; use the no-results fallback instead.>'
-      : '<Search not made because the query was classified as answerable without web results. Answer from general knowledge and do not use the no-results fallback solely because search was skipped.>';
+      const [widgetOutputs, searchResults] = await Promise.all([
+        widgetPromise,
+        searchPromise,
+      ]);
 
-    if (searchResults && searchResults.searchFindings.length > 0) {
-      finalContext = searchResults.searchFindings
-        .map((f, index) => {
-          const source = {
-            index: index + 1,
-            title: f.metadata.title,
-            url: f.metadata.url,
-            content: f.content,
+      session.emit('data', {
+        type: 'researchComplete',
+      });
+
+      const searchWasAttempted = searchPromise !== null;
+      let finalContext = searchWasAttempted
+        ? '<Search was attempted but returned no usable text results. Do not answer from stale general knowledge for current/source-backed questions; use the no-results fallback instead.>'
+        : '<Search not made because the query was classified as answerable without web results. Answer from general knowledge and do not use the no-results fallback solely because search was skipped.>';
+
+      if (searchResults && searchResults.searchFindings.length > 0) {
+        finalContext = searchResults.searchFindings
+          .map((f, index) => {
+            const source = {
+              index: index + 1,
+              title: f.metadata.title,
+              url: f.metadata.url,
+              content: f.content,
+            };
+
+            return `<result>${JSON.stringify(source)}</result>`;
+          })
+          .join('\n');
+      }
+
+      const widgetContext = widgetOutputs
+        .map((o) => {
+          return `<result>${o.llmContext}</result>`;
+        })
+        .join('\n-------------\n');
+
+      const finalContextWithWidgets = `<search_results note="These are the search results and assistant can cite these">\n${finalContext}\n</search_results>\n<widgets_result noteForAssistant="Its output is already showed to the user, assistant can use this information to answer the query but do not CITE this as a souce">\n${widgetContext}\n</widgets_result>`;
+
+      const writerPrompt = getWriterPrompt(
+        finalContextWithWidgets,
+        input.config.systemInstructions,
+        input.config.mode,
+      );
+
+      const answerStream = input.config.llm.streamText({
+        messages: [
+          {
+            role: 'system',
+            content: writerPrompt,
+          },
+          ...input.chatHistory,
+          {
+            role: 'user',
+            content: input.followUp,
+          },
+        ],
+      });
+
+      let responseBlockId = '';
+
+      for await (const chunk of answerStream) {
+        if (!responseBlockId) {
+          const block: TextBlock = {
+            id: crypto.randomUUID(),
+            type: 'text',
+            data: chunk.contentChunk,
           };
 
-          return `<result>${JSON.stringify(source)}</result>`;
-        })
-        .join('\n');
-    }
+          session.emitBlock(block);
 
-    const widgetContext = widgetOutputs
-      .map((o) => {
-        return `<result>${o.llmContext}</result>`;
-      })
-      .join('\n-------------\n');
+          responseBlockId = block.id;
+        } else {
+          const block = session.getBlock(responseBlockId) as TextBlock | null;
 
-    const finalContextWithWidgets = `<search_results note="These are the search results and assistant can cite these">\n${finalContext}\n</search_results>\n<widgets_result noteForAssistant="Its output is already showed to the user, assistant can use this information to answer the query but do not CITE this as a souce">\n${widgetContext}\n</widgets_result>`;
+          if (!block) {
+            continue;
+          }
 
-    const writerPrompt = getWriterPrompt(
-      finalContextWithWidgets,
-      input.config.systemInstructions,
-      input.config.mode,
-    );
+          block.data += chunk.contentChunk;
 
-    const answerStream = input.config.llm.streamText({
-      messages: [
-        {
-          role: 'system',
-          content: writerPrompt,
-        },
-        ...input.chatHistory,
-        {
-          role: 'user',
-          content: input.followUp,
-        },
-      ],
-    });
-
-    let responseBlockId = '';
-
-    for await (const chunk of answerStream) {
-      if (!responseBlockId) {
-        const block: TextBlock = {
-          id: crypto.randomUUID(),
-          type: 'text',
-          data: chunk.contentChunk,
-        };
-
-        session.emitBlock(block);
-
-        responseBlockId = block.id;
-      } else {
-        const block = session.getBlock(responseBlockId) as TextBlock | null;
-
-        if (!block) {
-          continue;
+          session.updateBlock(block.id, [
+            {
+              op: 'replace',
+              path: '/data',
+              value: block.data,
+            },
+          ]);
         }
-
-        block.data += chunk.contentChunk;
-
-        session.updateBlock(block.id, [
-          {
-            op: 'replace',
-            path: '/data',
-            value: block.data,
-          },
-        ]);
       }
+
+      session.emit('end', {});
+
+      const responseBlocks = session.getAllBlocks();
+
+      await db
+        .update(messages)
+        .set({
+          status: 'completed',
+          responseBlocks,
+        })
+        .where(
+          and(
+            eq(messages.chatId, input.chatId),
+            eq(messages.messageId, input.messageId),
+          ),
+        )
+        .execute();
+
+      recordQueryAnalytics({
+        queryText: input.followUp,
+        model: input.analytics?.model,
+        provider: input.analytics?.provider,
+        status: 'success',
+        startedAt: analyticsStartedAt,
+        completedAt: new Date(),
+        responseBlocks,
+        responseId: session.id,
+        messageId: input.messageId,
+        chatId: input.chatId,
+        userId: input.analytics?.userId,
+        organizationId: input.analytics?.organizationId,
+      }).catch((analyticsErr) => {
+        console.error(
+          'Failed to record successful query analytics:',
+          analyticsErr,
+        );
+      });
+    } catch (err) {
+      await recordQueryAnalytics({
+        queryText: input.followUp,
+        model: input.analytics?.model,
+        provider: input.analytics?.provider,
+        status: 'error',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        startedAt: analyticsStartedAt,
+        completedAt: new Date(),
+        responseId: session.id,
+        messageId: input.messageId,
+        chatId: input.chatId,
+        userId: input.analytics?.userId,
+        organizationId: input.analytics?.organizationId,
+      }).catch((analyticsErr) => {
+        console.error('Failed to record query analytics:', analyticsErr);
+      });
+      throw err;
     }
-
-    session.emit('end', {});
-
-    await db
-      .update(messages)
-      .set({
-        status: 'completed',
-        responseBlocks: session.getAllBlocks(),
-      })
-      .where(
-        and(
-          eq(messages.chatId, input.chatId),
-          eq(messages.messageId, input.messageId),
-        ),
-      )
-      .execute();
   }
 }
 

@@ -36,3 +36,29 @@ export const chats = sqliteTable('chats', {
     .$type<DBFile[]>()
     .default(sql`'[]'`),
 });
+
+export const queryAnalytics = sqliteTable('query_analytics', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id'),
+  userId: text('user_id'),
+  queryText: text('query_text').notNull(),
+  model: text('model'),
+  provider: text('provider'),
+  status: text('status', { enum: ['success', 'error'] }).notNull(),
+  errorMessage: text('error_message'),
+  startedAt: text('started_at').notNull(),
+  completedAt: text('completed_at'),
+  latencyMs: integer('latency_ms'),
+  promptTokens: integer('prompt_tokens'),
+  completionTokens: integer('completion_tokens'),
+  totalTokens: integer('total_tokens'),
+  estimatedCost: integer('estimated_cost'),
+  responseId: text('response_id'),
+  messageId: text('message_id'),
+  chatId: text('chat_id'),
+  citationCount: integer('citation_count'),
+  feedbackRating: integer('feedback_rating'),
+  feedbackText: text('feedback_text'),
+  evaluationScore: integer('evaluation_score'),
+  createdAt: text('created_at').notNull(),
+});

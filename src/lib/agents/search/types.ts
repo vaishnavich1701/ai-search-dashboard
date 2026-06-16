@@ -21,6 +21,13 @@ export type SearchAgentInput = {
   config: SearchAgentConfig;
   chatId: string;
   messageId: string;
+  analytics?: {
+    startedAt: Date;
+    provider?: string | null;
+    model?: string | null;
+    userId?: string | null;
+    organizationId?: string | null;
+  };
 };
 
 export type WidgetInput = {

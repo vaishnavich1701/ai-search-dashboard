@@ -9,6 +9,7 @@ import db from '@/lib/db';
 import { and, eq } from 'drizzle-orm';
 import { chats, messages } from '@/lib/db/schema';
 import UploadManager from '@/lib/uploads/manager';
+import { getTrustedRequestActor } from '@/lib/requestActor';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -178,6 +179,7 @@ export const POST = async (req: Request) => {
 
     const agent = new SearchAgent();
     const session = SessionManager.createSession();
+    const requestActor = getTrustedRequestActor(req);
 
     const responseStream = new TransformStream();
     const writer = responseStream.writable.getWriter();
@@ -243,6 +245,13 @@ export const POST = async (req: Request) => {
         followUp: message.content,
         chatId: body.message.chatId,
         messageId: body.message.messageId,
+        analytics: {
+          startedAt: new Date(),
+          provider: body.chatModel.providerId,
+          model: body.chatModel.key,
+          userId: requestActor.userId,
+          organizationId: requestActor.organizationId,
+        },
         config: {
           llm,
           embedding: embedding,

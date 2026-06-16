@@ -7,6 +7,10 @@ services:
       - '3000:3000'
     volumes:
       - data:/home/vane/data
+    environment:
+      # Create a .env file next to this compose file and set ADMIN_ANALYTICS_TOKEN.
+      # Docker Compose reads .env automatically for `docker compose build` / `up`.
+      ADMIN_ANALYTICS_TOKEN: ${ADMIN_ANALYTICS_TOKEN:?Set ADMIN_ANALYTICS_TOKEN in .env before starting Vane}
     restart: unless-stopped
 
 volumes:

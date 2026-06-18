@@ -4,13 +4,11 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
-  BadgeCheck,
   Clock,
   DollarSign,
   FileSearch,
   MessageSquareHeart,
   ShieldAlert,
-  Sparkles,
   Target,
   TrendingUp,
 } from 'lucide-react';
@@ -140,114 +138,114 @@ export default function AdminEvaluationsPage() {
   const totals = summary?.totals || {};
   const quality = summary?.quality?.[0] || {};
   const total = Number(totals.total || 0);
-  const successRate = total
-    ? (Number(totals.success || 0) / total) * 100
-    : null;
   const citationRate = total
     ? (Number(totals.withCitations || 0) / total) * 100
     : null;
-  const feedbackScore = boundedPercent(
-    quality.avgFeedback === null || quality.avgFeedback === undefined
-      ? null
-      : Number(quality.avgFeedback) * 20,
-  );
-  const evaluationScore = boundedPercent(quality.avgEvaluation);
-  const latencyScore = inverseLatencyScore(totals.avgLatency);
-  const costScore =
-    totals.avgCost === null || totals.avgCost === undefined
-      ? null
-      : boundedPercent(100 - Number(totals.avgCost) / 1000);
-  const overallInputs = [
-    successRate,
-    citationRate,
-    feedbackScore,
-    evaluationScore,
-    latencyScore,
-    costScore,
-  ].filter((n): n is number => n !== null && n !== undefined);
-  const overallScore = overallInputs.length
-    ? overallInputs.reduce((sum, n) => sum + n, 0) / overallInputs.length
+  const helpfulCount = Number(quality.helpfulCount || 0);
+  const notHelpfulCount = Number(quality.notHelpfulCount || 0);
+  const feedbackCount = Number(quality.feedbackCount || 0);
+  const helpfulRate = feedbackCount
+    ? (helpfulCount / feedbackCount) * 100
     : null;
+  const latencyScore = inverseLatencyScore(totals.avgLatency);
+  const costAvailable = totals.avgCost !== null && totals.avgCost !== undefined;
+
+  const feedbackSummary = feedbackCount
+    ? `${fmt(helpfulCount)} helpful / ${fmt(notHelpfulCount)} not helpful`
+    : 'No feedback yet';
+
+  const feedbackLabel = (rating: any) => {
+    if (rating === 1) return 'Helpful';
+    if (rating === -1) return 'Not helpful';
+    return 'No feedback';
+  };
+
+  const costStatus = (value: any) =>
+    value === null || value === undefined
+      ? 'Unavailable — no pricing metadata'
+      : `Logged estimate ${cost(value)}`;
+
+  const evaluationStatus = (row: any) =>
+    row.evaluation_score === null || row.evaluation_score === undefined
+      ? 'Not evaluated yet'
+      : `Generic evaluation score: ${row.evaluation_score}`;
 
   const metrics: Metric[] = [
     {
       title: 'Relevance',
-      score: evaluationScore !== null ? pct(evaluationScore) : 'Pending',
+      score: 'Not evaluated yet',
       explanation:
-        evaluationScore !== null
-          ? 'Average stored evaluation score for how directly answers satisfy the query intent.'
-          : 'No dedicated relevance scores are stored yet; this will populate when evaluations are recorded.',
-      status: qualityStatus(evaluationScore),
+        'No dedicated relevance evaluation field is exposed by the current database/API, so this page does not infer relevance from other signals.',
+      status: 'Waiting',
       icon: Target,
     },
     {
-      title: 'User-rated helpfulness',
-      score: feedbackScore !== null ? pct(feedbackScore) : 'Pending',
+      title: 'Helpfulness',
+      score: 'Not evaluated yet',
       explanation:
-        feedbackScore !== null
-          ? 'Derived only from explicit user Helpful / Not helpful ratings to reflect whether answers were useful in practice.'
-          : 'Waiting for user feedback ratings or evaluator scores to establish helpfulness.',
-      status: qualityStatus(feedbackScore),
+        'No dedicated evaluator-scored helpfulness field is stored. Explicit Helpful / Not helpful clicks are shown separately as user feedback.',
+      status: 'Waiting',
       icon: MessageSquareHeart,
     },
     {
-      title: 'Groundedness',
-      score: citationRate !== null ? pct(citationRate) : 'Pending',
+      title: 'User feedback',
+      score: feedbackSummary,
+      explanation:
+        helpfulRate === null
+          ? 'No explicit Helpful / Not helpful feedback has been recorded yet.'
+          : `Helpful rate is ${pct(helpfulRate)} from ${fmt(feedbackCount)} explicit feedback record${feedbackCount === 1 ? '' : 's'}.`,
+      status: qualityStatus(helpfulRate),
+      icon: MessageSquareHeart,
+    },
+    {
+      title: 'Grounding proxy',
+      score: citationRate !== null ? pct(citationRate) : 'No query logs yet',
       explanation:
         citationRate !== null
-          ? 'Share of recorded answers with citations or source evidence attached.'
-          : 'No scored queries are available to calculate source grounding yet.',
+          ? 'Proxy only: share of logged answers with citations or source evidence attached. This is not a scored groundedness evaluation.'
+          : 'No logged queries are available to calculate a citation/source-evidence proxy.',
       status: qualityStatus(citationRate),
       icon: FileSearch,
     },
     {
-      title: 'Hallucination risk',
-      score: citationRate !== null ? pct(100 - citationRate) : 'Pending',
+      title: 'Citation-risk proxy',
+      score:
+        citationRate !== null ? pct(100 - citationRate) : 'No query logs yet',
       explanation:
         citationRate !== null
-          ? 'A proxy risk indicator based on answers that lack citations; lower is better.'
-          : 'Risk will be estimated once queries include citation and evaluation data.',
+          ? 'Proxy only: share of logged answers missing citations/source evidence. Lower is better and this is not a real hallucination score.'
+          : 'No logged queries are available to calculate citation-risk proxy.',
       status: qualityStatus(citationRate),
       icon: ShieldAlert,
     },
     {
       title: 'Latency',
       score: ms(totals.avgLatency),
-      explanation: `Average response latency with P95 at ${ms(totals.p95Latency)} for recent logged queries.`,
+      explanation: `Average logged response latency with P95 at ${ms(totals.p95Latency)}.`,
       status: qualityStatus(latencyScore),
       icon: Clock,
     },
     {
       title: 'Cost efficiency',
-      score: cost(totals.avgCost),
-      explanation:
-        totals.avgCost === null || totals.avgCost === undefined
-          ? 'Pricing metadata is not configured, so the dashboard avoids presenting fake cost estimates.'
-          : 'Average estimated cost per query, normalized into an efficiency signal.',
-      status: qualityStatus(costScore),
+      score: costAvailable ? cost(totals.avgCost) : 'Unavailable',
+      explanation: costAvailable
+        ? 'Logged estimated cost is available; no separate cost-efficiency score is inferred.'
+        : 'Pricing metadata is not configured, so the dashboard does not present a cost-efficiency score.',
+      status: 'Waiting',
       icon: DollarSign,
     },
     {
-      title: 'User rating score',
-      score: feedbackScore !== null ? pct(feedbackScore) : 'Pending',
-      explanation: `${fmt(quality.feedbackCount)} feedback records captured from explicit user answer ratings.`,
-      status: qualityStatus(feedbackScore),
-      icon: BadgeCheck,
-    },
-    {
-      title: 'Overall quality score',
-      score: overallScore !== null ? pct(overallScore) : 'Pending',
+      title: 'Overall quality',
+      score: 'Not evaluated yet',
       explanation:
-        overallScore !== null
-          ? 'Composite view across available success, grounding, feedback, evaluation, latency, and cost signals.'
-          : 'Overall quality needs at least one scored query, feedback signal, or evaluation record.',
-      status: qualityStatus(overallScore),
-      icon: Sparkles,
+        'No dedicated overall quality evaluation field is exposed by the current database/API, so no composite quality score is calculated.',
+      status: 'Waiting',
+      icon: Target,
     },
   ];
 
   const hasEvaluationData = Boolean(
-    total || quality.feedbackCount || quality.evaluationCount,
+    total || feedbackCount || quality.evaluationCount,
   );
 
   return (
@@ -265,9 +263,10 @@ export default function AdminEvaluationsPage() {
               Evaluation metrics
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60 dark:text-white/60">
-              Monitor AI answer quality across relevance, user-rated
-              helpfulness, groundedness, hallucination risk, latency, cost
-              efficiency, feedback, and overall performance.
+              Monitor AI answer quality without inferred scores: real evaluation
+              fields remain marked as not evaluated, explicit user feedback is
+              counted directly, and citation-based signals are labeled as
+              proxies.
             </p>
           </div>
           <input
@@ -309,13 +308,13 @@ export default function AdminEvaluationsPage() {
               <section className="mt-8 rounded-2xl border border-dashed border-light-200 bg-light-secondary p-8 text-center dark:border-dark-200 dark:bg-dark-secondary">
                 <Activity className="mx-auto text-sky-500" size={34} />
                 <h2 className="mt-4 text-xl font-semibold">
-                  Evaluations will appear after queries are scored
+                  Evaluation data will appear after queries are scored
                 </h2>
                 <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-black/60 dark:text-white/60">
-                  No evaluation records, feedback ratings, or scored query logs
-                  exist yet. Once queries are rated by users or evaluation jobs,
-                  this page will summarize quality trends and list the most
-                  recent records for review.
+                  No query logs, explicit feedback, or evaluation records exist
+                  yet. Once users submit feedback or evaluation jobs store
+                  dedicated scores, this page will show those real signals
+                  without inventing quality percentages.
                 </p>
               </section>
             ) : (
@@ -326,8 +325,9 @@ export default function AdminEvaluationsPage() {
                       <TrendingUp size={18} /> Recent evaluation records
                     </h2>
                     <p className="mt-1 text-xs text-black/50 dark:text-white/50">
-                      Includes available evaluation, user rating, grounding,
-                      latency, and cost signals from recent queries.
+                      Separates query text, explicit user feedback, notes,
+                      citation-based grounding proxy, latency, cost metadata,
+                      and evaluation status from recent queries.
                     </p>
                   </div>
                   <Link
@@ -343,12 +343,18 @@ export default function AdminEvaluationsPage() {
                       <tr>
                         <th className="px-3 py-3 font-medium">Created</th>
                         <th className="px-3 py-3 font-medium">Query</th>
-                        <th className="px-3 py-3 font-medium">Evaluation</th>
-                        <th className="px-3 py-3 font-medium">User rating</th>
-                        <th className="px-3 py-3 font-medium">Grounding</th>
+                        <th className="px-3 py-3 font-medium">
+                          Explicit user feedback
+                        </th>
+                        <th className="px-3 py-3 font-medium">Feedback note</th>
+                        <th className="px-3 py-3 font-medium">
+                          Grounding/citations
+                        </th>
                         <th className="px-3 py-3 font-medium">Latency</th>
-                        <th className="px-3 py-3 font-medium">Cost</th>
-                        <th className="px-3 py-3 font-medium">Status</th>
+                        <th className="px-3 py-3 font-medium">Cost status</th>
+                        <th className="px-3 py-3 font-medium">
+                          Evaluation status
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -368,10 +374,10 @@ export default function AdminEvaluationsPage() {
                               </div>
                             </td>
                             <td className="px-3 py-4 align-top">
-                              {r.evaluation_score ?? '—'}
+                              {feedbackLabel(r.feedback_rating)}
                             </td>
                             <td className="px-3 py-4 align-top">
-                              {r.feedback_rating ?? '—'}
+                              {r.feedback_text || 'No note'}
                             </td>
                             <td className="px-3 py-4 align-top">
                               {fmt(r.citation_count)} citations
@@ -380,9 +386,11 @@ export default function AdminEvaluationsPage() {
                               {ms(r.latency_ms)}
                             </td>
                             <td className="px-3 py-4 align-top">
-                              {cost(r.estimated_cost)}
+                              {costStatus(r.estimated_cost)}
                             </td>
-                            <td className="px-3 py-4 align-top">{r.status}</td>
+                            <td className="px-3 py-4 align-top">
+                              {evaluationStatus(r)}
+                            </td>
                           </tr>
                         ))
                       ) : (

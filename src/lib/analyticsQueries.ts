@@ -117,7 +117,7 @@ export const getAnalyticsSummary = (filters: Filters) => {
       'GROUP BY date(created_at), model, provider ORDER BY date(created_at)',
     ),
     quality: group(
-      'SELECT COUNT(*) as total, AVG(citation_count) as avgCitations, SUM(CASE WHEN citation_count > 0 THEN 1 ELSE 0 END) as withCitations, COUNT(feedback_rating) as feedbackCount, AVG(feedback_rating) as avgFeedback, COUNT(evaluation_score) as evaluationCount, AVG(evaluation_score) as avgEvaluation',
+      'SELECT COUNT(*) as total, AVG(citation_count) as avgCitations, SUM(CASE WHEN citation_count > 0 THEN 1 ELSE 0 END) as withCitations, COUNT(feedback_rating) as feedbackCount, SUM(CASE WHEN feedback_rating = 1 THEN 1 ELSE 0 END) as helpfulCount, SUM(CASE WHEN feedback_rating = -1 THEN 1 ELSE 0 END) as notHelpfulCount, AVG(feedback_rating) as avgFeedback, COUNT(evaluation_score) as evaluationCount, AVG(evaluation_score) as avgEvaluation',
     ),
     byUser: group(
       "SELECT COALESCE(user_id, 'Anonymous') as userId, COALESCE(organization_id, 'None') as organizationId, COUNT(*) as total",

@@ -81,7 +81,7 @@ export const recordQueryAnalytics = async (input: {
   userId?: string | null;
   organizationId?: string | null;
   optimizationMode?: string | null;
-  sources?: string[] | null;
+  sources?: unknown[] | null;
   location?: {
     city?: string | null;
     region?: string | null;
@@ -126,7 +126,9 @@ export const recordQueryAnalytics = async (input: {
       : 0,
     optimizationMode: input.optimizationMode ?? null,
     sources: input.sources?.length ? JSON.stringify(input.sources) : null,
-    sourceCount: input.sources?.length ?? null,
+    sourceCount: input.responseBlocks
+      ? getCitationCount(input.responseBlocks)
+      : (input.sources?.length ?? null),
     geoCity: input.location?.city ?? null,
     geoRegion: input.location?.region ?? null,
     geoCountry: input.location?.country ?? null,

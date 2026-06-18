@@ -9,6 +9,12 @@ import { messages } from '@/lib/db/schema';
 import { and, eq, gt } from 'drizzle-orm';
 import { Block, Chunk, TextBlock } from '@/lib/types';
 import { recordQueryAnalytics } from '@/lib/analytics';
+import {
+  buildGroundedFallbackAnswer,
+  buildGroundedSearchContext,
+  countInlineCitations,
+  sourceDebugSummary,
+} from './grounding';
 
 const getErrorMessage = (err: unknown) =>
   err instanceof Error ? err.message : String(err || 'Unknown chat error');
@@ -193,19 +199,24 @@ class SearchAgent {
         );
       }
 
-      if (searchResults && searchResults.searchFindings.length > 0) {
-        finalContext = searchResults.searchFindings
-          .map((f, index) => {
-            const source = {
-              index: index + 1,
-              title: f.metadata.title,
-              url: f.metadata.url,
-              content: f.content,
-            };
+      let sourceContextLength = 0;
+      let generatedWithSourceContext = false;
 
-            return `<result>${JSON.stringify(source)}</result>`;
-          })
-          .join('\n');
+      if (searchResults && searchResults.searchFindings.length > 0) {
+        const groundedContext = buildGroundedSearchContext(
+          searchResults.searchFindings,
+        );
+        finalContext = groundedContext.context;
+        sourceContextLength = groundedContext.length;
+        generatedWithSourceContext = groundedContext.sourceCount > 0;
+
+        logQueryRuntime('search grounding context prepared', {
+          query: input.followUp,
+          retrievedSourceCount: searchResults.searchFindings.length,
+          contextSourceCount: groundedContext.sourceCount,
+          topSources: sourceDebugSummary(searchResults.searchFindings),
+          sourceContextLength,
+        });
       }
 
       const widgetContext = widgetOutputs
@@ -225,6 +236,9 @@ class SearchAgent {
       logQueryRuntime('generation started', {
         model: input.analytics?.model,
         provider: input.analytics?.provider,
+        retrievedSourceCount: retrievedSources.length,
+        sourceContextLength,
+        generatedWithSourceContext,
       });
 
       const answerStream = input.config.llm.streamText({
@@ -274,6 +288,48 @@ class SearchAgent {
       }
 
       const currentBlocks = session.getAllBlocks();
+      const answerBlock = responseBlockId
+        ? (session.getBlock(responseBlockId) as TextBlock | null)
+        : null;
+      const finalInlineCitationCount = countInlineCitations(
+        answerBlock?.data ?? '',
+      );
+
+      if (
+        generatedWithSourceContext &&
+        retrievedSources.length > 0 &&
+        finalInlineCitationCount === 0
+      ) {
+        const fallbackAnswer = buildGroundedFallbackAnswer(
+          input.followUp,
+          retrievedSources,
+        );
+
+        logQueryRuntime('ungrounded answer fallback applied', {
+          query: input.followUp,
+          retrievedSourceCount: retrievedSources.length,
+          sourceContextLength,
+          finalCitationCount: finalInlineCitationCount,
+        });
+
+        if (answerBlock) {
+          answerBlock.data = fallbackAnswer;
+          session.updateBlock(answerBlock.id, [
+            {
+              op: 'replace',
+              path: '/data',
+              value: fallbackAnswer,
+            },
+          ]);
+        } else {
+          session.emitBlock({
+            id: crypto.randomUUID(),
+            type: 'text',
+            data: fallbackAnswer,
+          });
+        }
+      }
+
       if (
         getSourceMetadata(currentBlocks).length === 0 &&
         retrievedSources.length > 0
@@ -297,7 +353,16 @@ class SearchAgent {
 
       logQueryRuntime('generation succeeded', {
         query: input.followUp,
-        citationCount: attachedSources.length,
+        retrievedSourceCount: retrievedSources.length,
+        attachedSourceCount: attachedSources.length,
+        sourceContextLength,
+        generatedWithSourceContext,
+        finalCitationCount: countInlineCitations(
+          responseBlocks
+            .filter((block): block is TextBlock => block.type === 'text')
+            .map((block) => block.data)
+            .join('\n'),
+        ),
       });
 
       await db

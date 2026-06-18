@@ -16,6 +16,9 @@ interface SearxngSearchResult {
   content?: string;
   author?: string;
   iframe_src?: string;
+  publishedDate?: string;
+  published_date?: string;
+  date?: string;
 }
 
 export class SearxngUnavailableError extends Error {

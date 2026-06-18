@@ -27,6 +27,17 @@ export type SearchAgentInput = {
     model?: string | null;
     userId?: string | null;
     organizationId?: string | null;
+    optimizationMode?: string | null;
+    sources?: string[] | null;
+    location?: {
+      city?: string | null;
+      region?: string | null;
+      country?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+      timezone?: string | null;
+      source?: string | null;
+    } | null;
   };
 };
 

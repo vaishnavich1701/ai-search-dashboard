@@ -73,6 +73,17 @@ export const recordQueryAnalytics = async (input: {
   chatId?: string | null;
   userId?: string | null;
   organizationId?: string | null;
+  optimizationMode?: string | null;
+  sources?: string[] | null;
+  location?: {
+    city?: string | null;
+    region?: string | null;
+    country?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    timezone?: string | null;
+    source?: string | null;
+  } | null;
 }) => {
   const completedAt = input.completedAt ?? new Date();
   const latencyMs = Math.max(
@@ -106,6 +117,24 @@ export const recordQueryAnalytics = async (input: {
     citationCount: input.responseBlocks
       ? getCitationCount(input.responseBlocks)
       : 0,
+    optimizationMode: input.optimizationMode ?? null,
+    sources: input.sources?.length ? JSON.stringify(input.sources) : null,
+    sourceCount: input.sources?.length ?? null,
+    geoCity: input.location?.city ?? null,
+    geoRegion: input.location?.region ?? null,
+    geoCountry: input.location?.country ?? null,
+    geoLatitude:
+      input.location?.latitude === undefined ||
+      input.location?.latitude === null
+        ? null
+        : Math.round(input.location.latitude * 1_000_000),
+    geoLongitude:
+      input.location?.longitude === undefined ||
+      input.location?.longitude === null
+        ? null
+        : Math.round(input.location.longitude * 1_000_000),
+    geoTimezone: input.location?.timezone ?? null,
+    geoSource: input.location?.source ?? null,
     createdAt: new Date().toISOString(),
   });
 };

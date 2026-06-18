@@ -9,7 +9,9 @@ import {
   Database,
   DollarSign,
   ShieldAlert,
+  MapPin,
   Star,
+  Users,
 } from 'lucide-react';
 
 type Summary = any;
@@ -27,6 +29,11 @@ const ms = (n: any) =>
   n === null || n === undefined
     ? '—'
     : `${Math.round(Number(n)).toLocaleString()} ms`;
+const coord = (n: any) =>
+  n === null || n === undefined ? null : (Number(n) / 1_000_000).toFixed(4);
+const locationLabel = (r: any) =>
+  [r.geo_city, r.geo_region, r.geo_country].filter(Boolean).join(', ') || '—';
+
 const cost = (n: any) =>
   n === null || n === undefined
     ? 'Cost unavailable'
@@ -233,6 +240,39 @@ export default function AdminAnalyticsPage() {
                 />
               </div>
             </section>
+            <section className="mt-6 grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-light-200 dark:border-dark-200 p-4">
+                <h2 className="mb-3 flex items-center gap-2 font-semibold">
+                  <Users size={18} /> Top user/org activity
+                </h2>
+                <Bars
+                  rows={summary.byUser}
+                  label={(r) => `${r.userId} / ${r.organizationId}`}
+                  value={(r) => r.total}
+                />
+              </div>
+              <div className="rounded-2xl border border-light-200 dark:border-dark-200 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h2 className="flex items-center gap-2 font-semibold">
+                    <MapPin size={18} /> Top geolocations
+                  </h2>
+                  <Link
+                    href="/admin/analytics/query-logs"
+                    className="text-xs text-sky-500"
+                  >
+                    Open detailed logs →
+                  </Link>
+                </div>
+                <Bars
+                  rows={summary.byLocation}
+                  label={(r) =>
+                    [r.city, r.region, r.country].filter(Boolean).join(', ') ||
+                    'Unknown'
+                  }
+                  value={(r) => r.total}
+                />
+              </div>
+            </section>
             <section className="mt-6 grid gap-4 lg:grid-cols-3">
               <div className="rounded-2xl border border-light-200 dark:border-dark-200 p-4">
                 <h2 className="mb-3 font-semibold">Latency trend</h2>
@@ -286,6 +326,8 @@ export default function AdminAnalyticsPage() {
                     <th>Created</th>
                     <th>Query</th>
                     <th>User/org</th>
+                    <th>Location</th>
+                    <th>Mode/sources</th>
                     <th>Model</th>
                     <th>Status</th>
                     <th>Latency</th>
@@ -311,6 +353,16 @@ export default function AdminAnalyticsPage() {
                           {r.user_id || 'Anonymous'} /{' '}
                           {r.organization_id || 'None'}
                         </td>
+                        <td
+                          title={[coord(r.geo_latitude), coord(r.geo_longitude)]
+                            .filter(Boolean)
+                            .join(', ')}
+                        >
+                          {locationLabel(r)}
+                        </td>
+                        <td>
+                          {r.optimization_mode || '—'} / {fmt(r.source_count)}
+                        </td>
                         <td>
                           {r.provider || '—'}/{r.model || '—'}
                         </td>
@@ -326,7 +378,7 @@ export default function AdminAnalyticsPage() {
                     <tr>
                       <td
                         className="py-6 text-center text-black/60 dark:text-white/60"
-                        colSpan={8}
+                        colSpan={10}
                       >
                         No query logs yet.
                       </td>

@@ -32,6 +32,16 @@ const embeddingModelSchema: z.ZodType<ModelWithProvider> = z.object({
   key: z.string({ message: 'Embedding model key must be provided' }),
 });
 
+const analyticsLocationSchema = z.object({
+  city: z.string().nullable().optional(),
+  region: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
+  timezone: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
+});
+
 const bodySchema = z.object({
   message: messageSchema,
   optimizationMode: z.enum(['speed', 'balanced', 'quality'], {
@@ -46,6 +56,7 @@ const bodySchema = z.object({
   chatModel: chatModelSchema,
   embeddingModel: embeddingModelSchema,
   systemInstructions: z.string().nullable().optional().default(''),
+  analyticsLocation: analyticsLocationSchema.nullable().optional(),
 });
 
 type Body = z.infer<typeof bodySchema>;
@@ -74,6 +85,28 @@ const normalizeProviderError = (err: unknown) => {
   return {
     code: 'CHAT_REQUEST_FAILED',
     message,
+  };
+};
+
+const getHeaderLocation = (req: Request) => {
+  const city = req.headers.get('x-vercel-ip-city');
+  const region = req.headers.get('x-vercel-ip-country-region');
+  const country =
+    req.headers.get('x-vercel-ip-country') || req.headers.get('cf-ipcountry');
+  const latitude = Number(req.headers.get('x-vercel-ip-latitude'));
+  const longitude = Number(req.headers.get('x-vercel-ip-longitude'));
+  const timezone = req.headers.get('x-vercel-ip-timezone');
+
+  if (!city && !region && !country && !Number.isFinite(latitude)) return null;
+
+  return {
+    city: city ? decodeURIComponent(city) : null,
+    region: region ? decodeURIComponent(region) : null,
+    country: country || null,
+    latitude: Number.isFinite(latitude) ? latitude : null,
+    longitude: Number.isFinite(longitude) ? longitude : null,
+    timezone: timezone || null,
+    source: 'request-headers',
   };
 };
 
@@ -180,6 +213,7 @@ export const POST = async (req: Request) => {
     const agent = new SearchAgent();
     const session = SessionManager.createSession();
     const requestActor = getTrustedRequestActor(req);
+    const requestLocation = body.analyticsLocation || getHeaderLocation(req);
 
     const responseStream = new TransformStream();
     const writer = responseStream.writable.getWriter();
@@ -251,6 +285,9 @@ export const POST = async (req: Request) => {
           model: body.chatModel.key,
           userId: requestActor.userId,
           organizationId: requestActor.organizationId,
+          optimizationMode: body.optimizationMode,
+          sources: body.sources,
+          location: requestLocation,
         },
         config: {
           llm,

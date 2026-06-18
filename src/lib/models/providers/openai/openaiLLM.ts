@@ -24,6 +24,7 @@ type OpenAIConfig = {
   apiKey: string;
   model: string;
   baseURL?: string;
+  defaultHeaders?: Record<string, string>;
   options?: GenerateOptions;
 };
 
@@ -36,6 +37,7 @@ class OpenAILLM extends BaseLLM<OpenAIConfig> {
     this.openAIClient = new OpenAI({
       apiKey: this.config.apiKey,
       baseURL: this.config.baseURL || 'https://api.openai.com/v1',
+      defaultHeaders: this.config.defaultHeaders,
     });
   }
 
@@ -117,6 +119,7 @@ class OpenAILLM extends BaseLLM<OpenAIConfig> {
             .filter((tc) => tc !== undefined) || [],
         additionalInfo: {
           finishReason: response.choices[0].finish_reason,
+          usage: response.usage,
         },
       };
     }
@@ -156,6 +159,7 @@ class OpenAILLM extends BaseLLM<OpenAIConfig> {
       presence_penalty:
         input.options?.presencePenalty ?? this.config.options?.presencePenalty,
       stream: true,
+      stream_options: { include_usage: true },
     });
 
     let recievedToolCalls: { name: string; id: string; arguments: string }[] =
@@ -188,6 +192,7 @@ class OpenAILLM extends BaseLLM<OpenAIConfig> {
           done: chunk.choices[0].finish_reason !== null,
           additionalInfo: {
             finishReason: chunk.choices[0].finish_reason,
+            usage: chunk.usage,
           },
         };
       }

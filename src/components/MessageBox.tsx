@@ -20,7 +20,7 @@ import SearchImages from './SearchImages';
 import SearchVideos from './SearchVideos';
 import { useSpeech } from 'react-text-to-speech';
 import ThinkBox from './ThinkBox';
-import { useChat, Section } from '@/lib/hooks/useChat';
+import { getMessageSources, useChat, Section } from '@/lib/hooks/useChat';
 import Citation from './MessageRenderer/Citation';
 import AssistantSteps from './AssistantSteps';
 import { ResearchBlock } from '@/lib/types';
@@ -64,12 +64,7 @@ const MessageBox = ({
   const speechMessage = section.speechMessage || '';
   const thinkingEnded = section.thinkingEnded;
 
-  const sourceBlocks = section.message.responseBlocks.filter(
-    (block): block is typeof block & { type: 'source' } =>
-      block.type === 'source',
-  );
-
-  const sources = sourceBlocks.flatMap((block) => block.data);
+  const sources = getMessageSources(section.message.responseBlocks);
 
   const hasContent = section.parsedTextBlocks.length > 0;
 

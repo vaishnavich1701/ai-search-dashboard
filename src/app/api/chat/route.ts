@@ -10,6 +10,7 @@ import { and, eq } from 'drizzle-orm';
 import { chats, messages } from '@/lib/db/schema';
 import UploadManager from '@/lib/uploads/manager';
 import { getTrustedRequestActor } from '@/lib/requestActor';
+import { recordQueryAnalytics } from '@/lib/analytics';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -162,6 +163,9 @@ const ensureChatExists = async (input: {
 };
 
 export const POST = async (req: Request) => {
+  let bodyForErrorLogging: Body | null = null;
+  const requestStartedAt = new Date();
+
   try {
     const reqBody = (await req.json()) as Body;
 
@@ -175,6 +179,7 @@ export const POST = async (req: Request) => {
     }
 
     const body = parseBody.data as Body;
+    bodyForErrorLogging = body;
     const { message } = body;
 
     if (message.content === '') {
@@ -343,6 +348,36 @@ export const POST = async (req: Request) => {
   } catch (err) {
     const providerError = normalizeProviderError(err);
     console.error('An error occurred while processing chat request:', err);
+
+    if (bodyForErrorLogging) {
+      const requestActor = getTrustedRequestActor(req);
+      await recordQueryAnalytics({
+        queryText: bodyForErrorLogging.message.content,
+        model: bodyForErrorLogging.chatModel.key,
+        provider: bodyForErrorLogging.chatModel.providerId,
+        status: 'error',
+        errorMessage:
+          'details' in providerError
+            ? providerError.details
+            : providerError.message,
+        startedAt: requestStartedAt,
+        completedAt: new Date(),
+        messageId: bodyForErrorLogging.message.messageId,
+        chatId: bodyForErrorLogging.message.chatId,
+        userId: requestActor.userId,
+        organizationId: requestActor.organizationId,
+        optimizationMode: bodyForErrorLogging.optimizationMode,
+        sources: bodyForErrorLogging.sources,
+        location:
+          bodyForErrorLogging.analyticsLocation || getHeaderLocation(req),
+      }).catch((analyticsErr) => {
+        console.error(
+          'Failed to record chat request error analytics:',
+          analyticsErr,
+        );
+      });
+    }
+
     return Response.json(
       { message: providerError.message, error: providerError },
       { status: providerError.code === 'MODEL_UNSUPPORTED' ? 400 : 500 },

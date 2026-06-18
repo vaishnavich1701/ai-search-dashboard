@@ -7,8 +7,11 @@ import { WidgetExecutor } from './widgets';
 import db from '@/lib/db';
 import { messages } from '@/lib/db/schema';
 import { and, eq, gt } from 'drizzle-orm';
-import { TextBlock } from '@/lib/types';
+import { Block, TextBlock } from '@/lib/types';
 import { recordQueryAnalytics } from '@/lib/analytics';
+
+const getErrorMessage = (err: unknown) =>
+  err instanceof Error ? err.message : String(err || 'Unknown chat error');
 
 class SearchAgent {
   async searchAsync(session: SessionManager, input: SearchAgentInput) {
@@ -105,6 +108,15 @@ class SearchAgent {
       let finalContext = searchWasAttempted
         ? '<Search was attempted but returned no usable text results. Do not answer from stale general knowledge for current/source-backed questions; use the no-results fallback instead.>'
         : '<Search not made because the query was classified as answerable without web results. Answer from general knowledge and do not use the no-results fallback solely because search was skipped.>';
+
+      if (
+        searchWasAttempted &&
+        (!searchResults || searchResults.searchFindings.length === 0)
+      ) {
+        throw new Error(
+          'Search completed but returned no usable sources. Try rephrasing the query or selecting another source.',
+        );
+      }
 
       if (searchResults && searchResults.searchFindings.length > 0) {
         finalContext = searchResults.searchFindings
@@ -222,14 +234,52 @@ class SearchAgent {
         );
       });
     } catch (err) {
+      const errorMessage = getErrorMessage(err);
+      const existingBlocks = session.getAllBlocks();
+      const hasReadableError = existingBlocks.some(
+        (block) => block.type === 'text' && block.data.trim().length > 0,
+      );
+      const responseBlocks: Block[] = hasReadableError
+        ? existingBlocks
+        : [
+            ...existingBlocks,
+            {
+              id: crypto.randomUUID(),
+              type: 'text',
+              data: errorMessage,
+            },
+          ];
+
+      if (!hasReadableError) {
+        session.emitBlock(responseBlocks[responseBlocks.length - 1]);
+      }
+
+      await db
+        .update(messages)
+        .set({
+          status: 'error',
+          responseBlocks,
+        })
+        .where(
+          and(
+            eq(messages.chatId, input.chatId),
+            eq(messages.messageId, input.messageId),
+          ),
+        )
+        .execute()
+        .catch((updateErr) => {
+          console.error('Failed to persist errored message:', updateErr);
+        });
+
       await recordQueryAnalytics({
         queryText: input.followUp,
         model: input.analytics?.model,
         provider: input.analytics?.provider,
         status: 'error',
-        errorMessage: err instanceof Error ? err.message : String(err),
+        errorMessage,
         startedAt: analyticsStartedAt,
         completedAt: new Date(),
+        responseBlocks,
         responseId: session.id,
         messageId: input.messageId,
         chatId: input.chatId,

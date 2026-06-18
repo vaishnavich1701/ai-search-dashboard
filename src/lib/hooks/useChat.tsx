@@ -1,7 +1,7 @@
 'use client';
 
 import { Message } from '@/components/ChatWindow';
-import { Block } from '@/lib/types';
+import { Block, Chunk } from '@/lib/types';
 import {
   createContext,
   useContext,
@@ -18,6 +18,39 @@ import { MinimalProvider } from '../models/types';
 import { getAutoMediaSearch } from '../config/clientRegistry';
 import { applyPatch } from 'rfc6902';
 import { Widget } from '@/components/ChatWindow';
+
+export const getMessageSources = (blocks: Block[]): Chunk[] => {
+  const explicitSources = blocks
+    .filter(
+      (block): block is Block & { type: 'source' } => block.type === 'source',
+    )
+    .flatMap((block) => block.data);
+
+  if (explicitSources.length > 0) return explicitSources;
+
+  const fallbackSources = blocks.flatMap((block) => {
+    if (block.type !== 'research') return [] as Chunk[];
+
+    return block.data.subSteps.flatMap((step) => {
+      if (step.type === 'search_results' || step.type === 'reading') {
+        return step.reading;
+      }
+      if (step.type === 'upload_search_results') {
+        return step.results;
+      }
+      return [] as Chunk[];
+    });
+  });
+
+  const seen = new Set<string>();
+  return fallbackSources.filter((source) => {
+    const key =
+      source.metadata?.url || `${source.metadata?.title}:${source.content}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 
 const getErrorMessage = async (res: Response) => {
   try {
@@ -333,10 +366,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       let thinkingEnded = false;
       let suggestions: string[] = [];
 
-      const sourceBlocks = msg.responseBlocks.filter(
-        (block): block is Block & { type: 'source' } => block.type === 'source',
-      );
-      const sources = sourceBlocks.flatMap((block) => block.data);
+      const sources = getMessageSources(msg.responseBlocks);
 
       const widgetBlocks = msg.responseBlocks
         .filter((b) => b.type === 'widget')
@@ -580,16 +610,18 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
               ? {
                   ...msg,
                   status: 'error' as const,
-                  responseBlocks:
-                    msg.responseBlocks.length > 0
-                      ? msg.responseBlocks
-                      : [
-                          {
-                            id: crypto.randomBytes(7).toString('hex'),
-                            type: 'text' as const,
-                            data: errorMessage,
-                          },
-                        ],
+                  responseBlocks: msg.responseBlocks.some(
+                    (block) => block.type === 'text' && block.data.trim(),
+                  )
+                    ? msg.responseBlocks
+                    : [
+                        ...msg.responseBlocks,
+                        {
+                          id: crypto.randomBytes(7).toString('hex'),
+                          type: 'text' as const,
+                          data: errorMessage,
+                        },
+                      ],
                 }
               : msg,
           ),

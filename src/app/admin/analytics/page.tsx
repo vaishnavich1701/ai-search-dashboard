@@ -266,12 +266,20 @@ export default function AdminAnalyticsPage() {
                   <h2 className="flex items-center gap-2 font-semibold">
                     <MapPin size={18} /> Top geolocations
                   </h2>
-                  <Link
-                    href="/admin/analytics/query-logs"
-                    className="text-xs text-sky-500"
-                  >
-                    Open detailed logs →
-                  </Link>
+                  <div className="flex gap-3">
+                    <Link
+                      href="/admin/evaluations"
+                      className="text-xs text-sky-500"
+                    >
+                      Evaluation metrics →
+                    </Link>
+                    <Link
+                      href="/admin/analytics/query-logs"
+                      className="text-xs text-sky-500"
+                    >
+                      Open detailed logs →
+                    </Link>
+                  </div>
                 </div>
                 <Bars
                   rows={summary.byLocation}

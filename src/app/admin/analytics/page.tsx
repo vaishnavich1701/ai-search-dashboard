@@ -40,17 +40,25 @@ const cost = (n: any) =>
     : `$${(Number(n) / 1_000_000).toFixed(4)}`;
 
 const Card = ({ title, value, note, icon: Icon }: any) => (
-  <div className="rounded-2xl border border-light-200 dark:border-dark-200 bg-light-secondary dark:bg-dark-secondary p-4">
+  <div className="flex min-h-36 flex-col justify-between rounded-2xl border border-light-200 bg-light-secondary p-5 dark:border-dark-200 dark:bg-dark-secondary">
     <div className="flex items-center justify-between text-sm text-black/60 dark:text-white/60">
       <span>{title}</span>
       <Icon size={18} />
     </div>
-    <div className="mt-3 text-3xl font-semibold">{value}</div>
+    <div className="mt-5 text-3xl font-semibold leading-tight">{value}</div>
     {note && (
-      <div className="mt-1 text-xs text-black/50 dark:text-white/50">
+      <div className="mt-2 text-xs text-black/50 dark:text-white/50">
         {note}
       </div>
     )}
+  </div>
+);
+
+const ChartCard = ({ children, className = '' }: any) => (
+  <div
+    className={`rounded-2xl border border-light-200 p-5 dark:border-dark-200 ${className}`}
+  >
+    {children}
   </div>
 );
 
@@ -70,10 +78,12 @@ const Bars = ({
         <p className="text-sm text-black/60 dark:text-white/60">No data yet.</p>
       ) : (
         rows.map((r, i) => (
-          <div key={i}>
-            <div className="flex justify-between text-xs">
-              <span>{label(r)}</span>
-              <span>{fmt(value(r))}</span>
+          <div key={i} className="min-w-0">
+            <div className="flex min-w-0 justify-between gap-3 text-xs">
+              <span className="min-w-0 truncate" title={label(r)}>
+                {label(r)}
+              </span>
+              <span className="shrink-0">{fmt(value(r))}</span>
             </div>
             <div className="h-2 rounded-full bg-black/10 dark:bg-white/10">
               <div
@@ -132,9 +142,9 @@ export default function AdminAnalyticsPage() {
 
   return (
     <main className="min-h-screen bg-light-primary dark:bg-dark-primary lg:pl-20">
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="flex flex-col gap-4 border-b border-light-200/30 dark:border-dark-200/30 pb-6 md:flex-row md:items-end md:justify-between">
-          <div>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+        <div className="flex flex-col gap-6 border-b border-light-200/30 pb-8 dark:border-dark-200/30 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-3xl">
             <Link href="/" className="text-sm text-sky-500">
               ← Back to chat
             </Link>
@@ -144,21 +154,21 @@ export default function AdminAnalyticsPage() {
             >
               Admin analytics
             </h1>
-            <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60 dark:text-white/60">
               Real query, model, quality, latency, and cost metrics captured
               from persisted AI usage.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <input
-              className="rounded-xl border border-light-200 dark:border-dark-200 bg-transparent px-3 py-2 text-sm"
+              className="rounded-xl border border-light-200 bg-transparent px-4 py-2.5 text-sm dark:border-dark-200"
               placeholder="Admin token"
               type="password"
               value={token}
               onChange={(e) => setToken(e.target.value)}
             />
             <select
-              className="rounded-xl border border-light-200 dark:border-dark-200 bg-transparent px-3 py-2 text-sm"
+              className="rounded-xl border border-light-200 bg-transparent px-4 py-2.5 text-sm dark:border-dark-200"
               value={status}
               onChange={(e) => {
                 setStatus(e.target.value);
@@ -190,7 +200,7 @@ export default function AdminAnalyticsPage() {
         )}
         {summary && (
           <>
-            <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <section className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
               <Card
                 title="Total queries"
                 value={fmt(totals.total)}
@@ -216,9 +226,9 @@ export default function AdminAnalyticsPage() {
                 icon={DollarSign}
               />
             </section>
-            <section className="mt-6 grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-light-200 dark:border-dark-200 p-4">
-                <h2 className="mb-3 flex items-center gap-2 font-semibold">
+            <section className="mt-8 grid gap-5 lg:grid-cols-2">
+              <ChartCard>
+                <h2 className="mb-4 flex items-center gap-2 font-semibold">
                   <BarChart3 size={18} /> Queries over time
                 </h2>
                 <Bars
@@ -226,9 +236,9 @@ export default function AdminAnalyticsPage() {
                   label={(r) => r.date}
                   value={(r) => r.total}
                 />
-              </div>
-              <div className="rounded-2xl border border-light-200 dark:border-dark-200 p-4">
-                <h2 className="mb-3 font-semibold">
+              </ChartCard>
+              <ChartCard>
+                <h2 className="mb-4 font-semibold">
                   Model/provider comparison
                 </h2>
                 <Bars
@@ -238,11 +248,11 @@ export default function AdminAnalyticsPage() {
                   }
                   value={(r) => r.total}
                 />
-              </div>
+              </ChartCard>
             </section>
-            <section className="mt-6 grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-light-200 dark:border-dark-200 p-4">
-                <h2 className="mb-3 flex items-center gap-2 font-semibold">
+            <section className="mt-8 grid gap-5 lg:grid-cols-2">
+              <ChartCard>
+                <h2 className="mb-4 flex items-center gap-2 font-semibold">
                   <Users size={18} /> Top user/org activity
                 </h2>
                 <Bars
@@ -250,9 +260,9 @@ export default function AdminAnalyticsPage() {
                   label={(r) => `${r.userId} / ${r.organizationId}`}
                   value={(r) => r.total}
                 />
-              </div>
-              <div className="rounded-2xl border border-light-200 dark:border-dark-200 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
+              </ChartCard>
+              <ChartCard>
+                <div className="mb-4 flex items-center justify-between gap-3">
                   <h2 className="flex items-center gap-2 font-semibold">
                     <MapPin size={18} /> Top geolocations
                   </h2>
@@ -271,19 +281,19 @@ export default function AdminAnalyticsPage() {
                   }
                   value={(r) => r.total}
                 />
-              </div>
+              </ChartCard>
             </section>
-            <section className="mt-6 grid gap-4 lg:grid-cols-3">
-              <div className="rounded-2xl border border-light-200 dark:border-dark-200 p-4">
-                <h2 className="mb-3 font-semibold">Latency trend</h2>
+            <section className="mt-8 grid gap-5 lg:grid-cols-3">
+              <ChartCard>
+                <h2 className="mb-4 font-semibold">Latency trend</h2>
                 <Bars
                   rows={summary.latencyTrend}
                   label={(r) => r.date}
                   value={(r) => Math.round(r.avgLatency || 0)}
                 />
-              </div>
-              <div className="rounded-2xl border border-light-200 dark:border-dark-200 p-4">
-                <h2 className="mb-3 font-semibold">Token/cost usage</h2>
+              </ChartCard>
+              <ChartCard>
+                <h2 className="mb-4 font-semibold">Token/cost usage</h2>
                 <p className="text-sm">
                   Prompt tokens: {fmt(totals.promptTokens)}
                 </p>
@@ -297,9 +307,9 @@ export default function AdminAnalyticsPage() {
                   Pricing metadata is not configured, so cost is unavailable
                   instead of estimated with fake rates.
                 </p>
-              </div>
-              <div className="rounded-2xl border border-light-200 dark:border-dark-200 p-4">
-                <h2 className="mb-3 flex items-center gap-2 font-semibold">
+              </ChartCard>
+              <ChartCard>
+                <h2 className="mb-4 flex items-center gap-2 font-semibold">
                   <Star size={18} /> Quality signals
                 </h2>
                 <p className="text-sm">
@@ -316,81 +326,139 @@ export default function AdminAnalyticsPage() {
                     No quality data yet beyond citation/source counts.
                   </p>
                 )}
-              </div>
+              </ChartCard>
             </section>
-            <section className="mt-6 rounded-2xl border border-light-200 dark:border-dark-200 p-4 overflow-x-auto">
-              <h2 className="mb-3 font-semibold">Recent query logs</h2>
-              <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="text-xs text-black/50 dark:text-white/50">
-                  <tr>
-                    <th>Created</th>
-                    <th>Query</th>
-                    <th>User/org</th>
-                    <th>Location</th>
-                    <th>Mode/sources</th>
-                    <th>Model</th>
-                    <th>Status</th>
-                    <th>Latency</th>
-                    <th>Cost</th>
-                    <th>Error</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs?.rows?.length ? (
-                    logs.rows.map((r) => (
-                      <tr
-                        key={r.id}
-                        className="border-t border-light-200/40 dark:border-dark-200/40"
-                      >
-                        <td className="py-2">
-                          {new Date(r.created_at).toLocaleString()}
-                        </td>
-                        <td className="max-w-xs truncate" title={r.query_text}>
-                          {r.query_text}
-                          {r.query_text_truncated ? ' (truncated)' : ''}
-                        </td>
-                        <td>
-                          {r.user_id || 'Anonymous'} /{' '}
-                          {r.organization_id || 'None'}
-                        </td>
-                        <td
-                          title={[coord(r.geo_latitude), coord(r.geo_longitude)]
-                            .filter(Boolean)
-                            .join(', ')}
+            <section className="mt-8 rounded-2xl border border-light-200 p-5 dark:border-dark-200">
+              <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <h2 className="font-semibold">Recent query logs</h2>
+                <p className="text-xs text-black/50 dark:text-white/50">
+                  Scroll horizontally for full log details.
+                </p>
+              </div>
+              <div className="overflow-x-auto rounded-xl border border-light-200/40 dark:border-dark-200/40">
+                <table className="w-full min-w-[1180px] table-fixed text-left text-sm">
+                  <colgroup>
+                    <col className="w-36" />
+                    <col className="w-80" />
+                    <col className="w-36" />
+                    <col className="w-44" />
+                    <col className="w-32" />
+                    <col className="w-64" />
+                    <col className="w-24" />
+                    <col className="w-28" />
+                    <col className="w-36" />
+                    <col className="w-56" />
+                  </colgroup>
+                  <thead className="text-xs text-black/50 dark:text-white/50">
+                    <tr>
+                      <th className="px-3 py-3 font-medium">Created</th>
+                      <th className="px-3 py-3 font-medium">Query</th>
+                      <th className="px-3 py-3 font-medium">User/org</th>
+                      <th className="px-3 py-3 font-medium">Location</th>
+                      <th className="px-3 py-3 font-medium">Mode/sources</th>
+                      <th className="px-3 py-3 font-medium">Model</th>
+                      <th className="px-3 py-3 font-medium">Status</th>
+                      <th className="px-3 py-3 font-medium">Latency</th>
+                      <th className="px-3 py-3 font-medium">Cost</th>
+                      <th className="px-3 py-3 font-medium">Error</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs?.rows?.length ? (
+                      logs.rows.map((r) => (
+                        <tr
+                          key={r.id}
+                          className="border-t border-light-200/40 dark:border-dark-200/40"
                         >
-                          {locationLabel(r)}
-                        </td>
-                        <td>
-                          {r.optimization_mode || '—'} / {fmt(r.source_count)}
-                        </td>
-                        <td>
-                          {r.provider || '—'}/{r.model || '—'}
-                        </td>
-                        <td>{r.status}</td>
-                        <td>{ms(r.latency_ms)}</td>
-                        <td>{cost(r.estimated_cost)}</td>
-                        <td className="max-w-xs truncate">
-                          {r.error_message || '—'}
+                          <td className="px-3 py-4 align-top text-xs leading-5">
+                            {new Date(r.created_at).toLocaleString()}
+                          </td>
+                          <td className="px-3 py-4 align-top">
+                            <div className="truncate" title={r.query_text}>
+                              {r.query_text}
+                              {r.query_text_truncated ? ' (truncated)' : ''}
+                            </div>
+                          </td>
+                          <td className="px-3 py-4 align-top">
+                            <div
+                              className="truncate"
+                              title={`${r.user_id || 'Anonymous'} / ${
+                                r.organization_id || 'None'
+                              }`}
+                            >
+                              {r.user_id || 'Anonymous'} /{' '}
+                              {r.organization_id || 'None'}
+                            </div>
+                          </td>
+                          <td
+                            className="px-3 py-4 align-top"
+                            title={[
+                              coord(r.geo_latitude),
+                              coord(r.geo_longitude),
+                            ]
+                              .filter(Boolean)
+                              .join(', ')}
+                          >
+                            <div className="truncate" title={locationLabel(r)}>
+                              {locationLabel(r)}
+                            </div>
+                          </td>
+                          <td className="px-3 py-4 align-top">
+                            <div
+                              className="truncate"
+                              title={`${r.optimization_mode || '—'} / ${fmt(
+                                r.source_count,
+                              )}`}
+                            >
+                              {r.optimization_mode || '—'} /{' '}
+                              {fmt(r.source_count)}
+                            </div>
+                          </td>
+                          <td className="px-3 py-4 align-top">
+                            <div
+                              className="truncate"
+                              title={`${r.provider || '—'}/${r.model || '—'}`}
+                            >
+                              {r.provider || '—'}/{r.model || '—'}
+                            </div>
+                          </td>
+                          <td className="px-3 py-4 align-top whitespace-nowrap">
+                            {r.status}
+                          </td>
+                          <td className="px-3 py-4 align-top whitespace-nowrap">
+                            {ms(r.latency_ms)}
+                          </td>
+                          <td className="px-3 py-4 align-top whitespace-nowrap">
+                            {cost(r.estimated_cost)}
+                          </td>
+                          <td className="px-3 py-4 align-top">
+                            <div
+                              className="truncate"
+                              title={r.error_message || '—'}
+                            >
+                              {r.error_message || '—'}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          className="px-3 py-6 text-center text-black/60 dark:text-white/60"
+                          colSpan={10}
+                        >
+                          No query logs yet.
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        className="py-6 text-center text-black/60 dark:text-white/60"
-                        colSpan={10}
-                      >
-                        No query logs yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-              <div className="mt-4 flex items-center justify-between text-sm">
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <span>
                   Page {logs?.page || 1} of {logs?.totalPages || 1}
                 </span>
-                <div className="space-x-2">
+                <div className="flex gap-2">
                   <button
                     className="rounded-lg border px-3 py-1 disabled:opacity-40"
                     disabled={page <= 1}

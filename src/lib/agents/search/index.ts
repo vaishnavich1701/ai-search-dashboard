@@ -7,15 +7,70 @@ import { WidgetExecutor } from './widgets';
 import db from '@/lib/db';
 import { messages } from '@/lib/db/schema';
 import { and, eq, gt } from 'drizzle-orm';
-import { Block, TextBlock } from '@/lib/types';
+import { Block, Chunk, TextBlock } from '@/lib/types';
 import { recordQueryAnalytics } from '@/lib/analytics';
 
 const getErrorMessage = (err: unknown) =>
   err instanceof Error ? err.message : String(err || 'Unknown chat error');
 
+const logQueryRuntime = (
+  message: string,
+  metadata?: Record<string, unknown>,
+) => {
+  if (process.env.NODE_ENV === 'production') return;
+  console.info(`[query] ${message}`, metadata ?? '');
+};
+
+const getSourceMetadata = (blocks: Block[]): Chunk[] => {
+  const sourceBlocks = blocks
+    .filter(
+      (block): block is Extract<Block, { type: 'source' }> =>
+        block.type === 'source',
+    )
+    .flatMap((block) => (Array.isArray(block.data) ? block.data : []));
+
+  if (sourceBlocks.length > 0) return sourceBlocks;
+
+  return blocks.flatMap((block) => {
+    if (block.type !== 'research') return [];
+
+    return block.data.subSteps.flatMap((step) => {
+      if (step.type === 'search_results') return step.reading;
+      if (step.type === 'upload_search_results') return step.results;
+      return [];
+    });
+  });
+};
+
+const ensureSourceBlock = (blocks: Block[], sources: Chunk[]): Block[] => {
+  if (sources.length === 0) return blocks;
+
+  const hasSourceBlock = blocks.some(
+    (block) => block.type === 'source' && Array.isArray(block.data),
+  );
+
+  if (hasSourceBlock) return blocks;
+
+  return [
+    ...blocks,
+    {
+      id: crypto.randomUUID(),
+      type: 'source',
+      data: sources,
+    },
+  ];
+};
+
 class SearchAgent {
   async searchAsync(session: SessionManager, input: SearchAgentInput) {
     const analyticsStartedAt = input.analytics?.startedAt ?? new Date();
+    let retrievedSources: Chunk[] = [];
+
+    logQueryRuntime('query started', {
+      query: input.followUp,
+      model: input.analytics?.model,
+      provider: input.analytics?.provider,
+    });
     const exists = await db.query.messages.findFirst({
       where: and(
         eq(messages.chatId, input.chatId),
@@ -87,12 +142,21 @@ class SearchAgent {
 
       if (!classification.classification.skipSearch) {
         const researcher = new Researcher();
-        searchPromise = researcher.research(session, {
-          chatHistory: input.chatHistory,
-          followUp: input.followUp,
-          classification: classification,
-          config: input.config,
-        });
+        logQueryRuntime('search started', { query: input.followUp });
+        searchPromise = researcher
+          .research(session, {
+            chatHistory: input.chatHistory,
+            followUp: input.followUp,
+            classification: classification,
+            config: input.config,
+          })
+          .catch((err) => {
+            logQueryRuntime('search failed', {
+              query: input.followUp,
+              error: getErrorMessage(err),
+            });
+            throw err;
+          });
       }
 
       const [widgetOutputs, searchResults] = await Promise.all([
@@ -105,6 +169,13 @@ class SearchAgent {
       });
 
       const searchWasAttempted = searchPromise !== null;
+      retrievedSources = searchResults?.searchFindings ?? [];
+      if (searchWasAttempted) {
+        logQueryRuntime('search succeeded', {
+          query: input.followUp,
+          sourceCount: retrievedSources.length,
+        });
+      }
       let finalContext = searchWasAttempted
         ? '<Search was attempted but returned no usable text results. Do not answer from stale general knowledge for current/source-backed questions; use the no-results fallback instead.>'
         : '<Search not made because the query was classified as answerable without web results. Answer from general knowledge and do not use the no-results fallback solely because search was skipped.>';
@@ -113,6 +184,10 @@ class SearchAgent {
         searchWasAttempted &&
         (!searchResults || searchResults.searchFindings.length === 0)
       ) {
+        logQueryRuntime('search failed', {
+          query: input.followUp,
+          error: 'Search completed but returned no usable sources.',
+        });
         throw new Error(
           'Search completed but returned no usable sources. Try rephrasing the query or selecting another source.',
         );
@@ -146,6 +221,11 @@ class SearchAgent {
         input.config.systemInstructions,
         input.config.mode,
       );
+
+      logQueryRuntime('generation started', {
+        model: input.analytics?.model,
+        provider: input.analytics?.provider,
+      });
 
       const answerStream = input.config.llm.streamText({
         messages: [
@@ -193,9 +273,32 @@ class SearchAgent {
         }
       }
 
+      const currentBlocks = session.getAllBlocks();
+      if (
+        getSourceMetadata(currentBlocks).length === 0 &&
+        retrievedSources.length > 0
+      ) {
+        session.emitBlock({
+          id: crypto.randomUUID(),
+          type: 'source',
+          data: retrievedSources,
+        });
+      }
+
+      const responseBlocks = ensureSourceBlock(
+        session.getAllBlocks(),
+        retrievedSources.length > 0
+          ? retrievedSources
+          : getSourceMetadata(session.getAllBlocks()),
+      );
+      const attachedSources = getSourceMetadata(responseBlocks);
+
       session.emit('end', {});
 
-      const responseBlocks = session.getAllBlocks();
+      logQueryRuntime('generation succeeded', {
+        query: input.followUp,
+        citationCount: attachedSources.length,
+      });
 
       await db
         .update(messages)
@@ -225,17 +328,54 @@ class SearchAgent {
         userId: input.analytics?.userId,
         organizationId: input.analytics?.organizationId,
         optimizationMode: input.analytics?.optimizationMode,
-        sources: input.analytics?.sources,
+        sources:
+          getSourceMetadata(responseBlocks).length > 0
+            ? getSourceMetadata(responseBlocks)
+            : input.analytics?.sources,
         location: input.analytics?.location,
-      }).catch((analyticsErr) => {
-        console.error(
-          'Failed to record successful query analytics:',
-          analyticsErr,
-        );
-      });
+      })
+        .then(() => {
+          logQueryRuntime('query log saved', {
+            query: input.followUp,
+            status: 'success',
+          });
+        })
+        .catch((analyticsErr) => {
+          console.error(
+            'Failed to record successful query analytics:',
+            analyticsErr,
+          );
+          logQueryRuntime('query log failed', {
+            query: input.followUp,
+            status: 'success',
+          });
+        });
     } catch (err) {
       const errorMessage = getErrorMessage(err);
-      const existingBlocks = session.getAllBlocks();
+      logQueryRuntime('generation failed', {
+        query: input.followUp,
+        model: input.analytics?.model,
+        provider: input.analytics?.provider,
+        error: errorMessage,
+      });
+      const currentErrorBlocks = session.getAllBlocks();
+      if (
+        getSourceMetadata(currentErrorBlocks).length === 0 &&
+        retrievedSources.length > 0
+      ) {
+        session.emitBlock({
+          id: crypto.randomUUID(),
+          type: 'source',
+          data: retrievedSources,
+        });
+      }
+
+      const existingBlocks = ensureSourceBlock(
+        session.getAllBlocks(),
+        retrievedSources.length > 0
+          ? retrievedSources
+          : getSourceMetadata(session.getAllBlocks()),
+      );
       const hasReadableError = existingBlocks.some(
         (block) => block.type === 'text' && block.data.trim().length > 0,
       );
@@ -286,11 +426,25 @@ class SearchAgent {
         userId: input.analytics?.userId,
         organizationId: input.analytics?.organizationId,
         optimizationMode: input.analytics?.optimizationMode,
-        sources: input.analytics?.sources,
+        sources:
+          getSourceMetadata(responseBlocks).length > 0
+            ? getSourceMetadata(responseBlocks)
+            : input.analytics?.sources,
         location: input.analytics?.location,
-      }).catch((analyticsErr) => {
-        console.error('Failed to record query analytics:', analyticsErr);
-      });
+      })
+        .then(() => {
+          logQueryRuntime('query log saved', {
+            query: input.followUp,
+            status: 'error',
+          });
+        })
+        .catch((analyticsErr) => {
+          console.error('Failed to record query analytics:', analyticsErr);
+          logQueryRuntime('query log failed', {
+            query: input.followUp,
+            status: 'error',
+          });
+        });
       throw err;
     }
   }

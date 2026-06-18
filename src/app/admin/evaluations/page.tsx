@@ -78,15 +78,15 @@ const MetricCard = ({ metric }: { metric: Metric }) => {
   return (
     <div className="flex min-h-48 flex-col justify-between rounded-2xl border border-light-200 bg-light-secondary p-5 dark:border-dark-200 dark:bg-dark-secondary">
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <p className="text-sm text-black/60 dark:text-white/60">
             {metric.title}
           </p>
-          <p className="mt-3 text-3xl font-semibold leading-tight">
+          <p className="mt-3 break-words text-3xl font-semibold leading-tight">
             {metric.score}
           </p>
         </div>
-        <div className="rounded-xl bg-black/5 p-2 dark:bg-white/10">
+        <div className="shrink-0 rounded-xl bg-black/5 p-2 dark:bg-white/10">
           <Icon size={20} />
         </div>
       </div>

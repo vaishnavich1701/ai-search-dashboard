@@ -21,6 +21,28 @@ import { splitText } from '@/lib/utils/splitText';
 const SEARCH_UNAVAILABLE_MESSAGE =
   'Search is temporarily unavailable. Please retry in a few seconds. If it still does not work, refresh the page and try again.';
 
+const getResultDate = (result: {
+  publishedDate?: string;
+  published_date?: string;
+  date?: string;
+}) => result.publishedDate ?? result.published_date ?? result.date;
+
+const getResultMetadata = (result: {
+  title: string;
+  url: string;
+  publishedDate?: string;
+  published_date?: string;
+  date?: string;
+}) => {
+  const publishedDate = getResultDate(result);
+
+  return {
+    title: result.title,
+    url: result.url,
+    ...(publishedDate ? { publishedDate } : {}),
+  };
+};
+
 const emitSearchUnavailable = (input: {
   session: InstanceType<typeof SessionManager>;
 }) => {
@@ -84,8 +106,7 @@ export const executeSearch = async (input: {
             return {
               content,
               metadata: {
-                title: r.title,
-                url: r.url,
+                ...getResultMetadata(r),
                 similarity: computeSimilarity(queryEmbedding, chunkEmbedding),
                 embedding: chunkEmbedding,
               },
@@ -107,8 +128,7 @@ export const executeSearch = async (input: {
           return {
             content,
             metadata: {
-              title: r.title,
-              url: r.url,
+              ...getResultMetadata(r),
               similarity: 1,
               embedding: [],
             },
@@ -240,8 +260,7 @@ export const executeSearch = async (input: {
         return {
           content,
           metadata: {
-            title: r.title,
-            url: r.url,
+            ...getResultMetadata(r),
             similarity: 1,
             embedding: [],
           },

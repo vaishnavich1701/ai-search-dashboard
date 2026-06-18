@@ -4,6 +4,7 @@ import { classify } from './classifier';
 import Researcher from './researcher';
 import { getWriterPrompt } from '@/lib/prompts/search/writer';
 import { WidgetExecutor } from './widgets';
+import { buildGroundedSearchContext } from './grounding';
 
 class APISearchAgent {
   async searchAsync(session: SessionManager, input: SearchAgentInput) {
@@ -58,18 +59,9 @@ class APISearchAgent {
       : '<Search not made because the query was classified as answerable without web results. Answer from general knowledge and do not use the no-results fallback solely because search was skipped.>';
 
     if (searchResults && searchResults.searchFindings.length > 0) {
-      finalContext = searchResults.searchFindings
-        .map((f, index) => {
-          const source = {
-            index: index + 1,
-            title: f.metadata.title,
-            url: f.metadata.url,
-            content: f.content,
-          };
-
-          return `<result>${JSON.stringify(source)}</result>`;
-        })
-        .join('\n');
+      finalContext = buildGroundedSearchContext(
+        searchResults.searchFindings,
+      ).context;
     }
 
     const widgetContext = widgetOutputs

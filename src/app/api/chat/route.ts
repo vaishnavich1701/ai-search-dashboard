@@ -11,6 +11,7 @@ import { chats, messages } from '@/lib/db/schema';
 import UploadManager from '@/lib/uploads/manager';
 import { getTrustedRequestActor } from '@/lib/requestActor';
 import { recordQueryAnalytics } from '@/lib/analytics';
+import { getConfiguredModelProviderById } from '@/lib/config/serverRegistry';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -130,6 +131,9 @@ const safeValidateBody = (data: unknown) => {
   };
 };
 
+const getProviderAnalyticsKey = (providerId: string) =>
+  getConfiguredModelProviderById(providerId)?.type ?? providerId;
+
 const ensureChatExists = async (input: {
   id: string;
   sources: SearchSources[];
@@ -192,6 +196,10 @@ export const POST = async (req: Request) => {
     }
 
     const registry = new ModelRegistry();
+
+    const analyticsProvider = getProviderAnalyticsKey(
+      body.chatModel.providerId,
+    );
 
     const [llm, embedding] = await Promise.all([
       registry.loadChatModel(body.chatModel.providerId, body.chatModel.key),
@@ -286,7 +294,7 @@ export const POST = async (req: Request) => {
         messageId: body.message.messageId,
         analytics: {
           startedAt: new Date(),
-          provider: body.chatModel.providerId,
+          provider: analyticsProvider,
           model: body.chatModel.key,
           userId: requestActor.userId,
           organizationId: requestActor.organizationId,
@@ -354,7 +362,9 @@ export const POST = async (req: Request) => {
       await recordQueryAnalytics({
         queryText: bodyForErrorLogging.message.content,
         model: bodyForErrorLogging.chatModel.key,
-        provider: bodyForErrorLogging.chatModel.providerId,
+        provider: getProviderAnalyticsKey(
+          bodyForErrorLogging.chatModel.providerId,
+        ),
         status: 'error',
         errorMessage:
           'details' in providerError

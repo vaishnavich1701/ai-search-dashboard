@@ -26,6 +26,7 @@ import AssistantSteps from './AssistantSteps';
 import { ResearchBlock } from '@/lib/types';
 import Renderer from './Widgets/Renderer';
 import CodeBlock from './MessageRenderer/CodeBlock';
+import AnswerFeedback from './AnswerFeedback';
 
 const ThinkTagProcessor = ({
   children,
@@ -188,33 +189,44 @@ const MessageBox = ({
                 </Markdown>
 
                 {loading && isLast ? null : (
-                  <div className="flex flex-row items-center justify-between w-full text-black dark:text-white py-4">
-                    <div className="flex flex-row items-center -ml-2">
-                      <Rewrite
-                        rewrite={rewrite}
+                  <>
+                    <div className="flex flex-row items-center justify-between w-full text-black dark:text-white py-4">
+                      <div className="flex flex-row items-center -ml-2">
+                        <Rewrite
+                          rewrite={rewrite}
+                          messageId={section.message.messageId}
+                        />
+                      </div>
+                      <div className="flex flex-row items-center -mr-2">
+                        <Copy
+                          initialMessage={parsedMessage}
+                          section={section}
+                        />
+                        <button
+                          onClick={() => {
+                            if (speechStatus === 'started') {
+                              stop();
+                            } else {
+                              start();
+                            }
+                          }}
+                          className="p-2 text-black/70 dark:text-white/70 rounded-full hover:bg-light-secondary dark:hover:bg-dark-secondary transition duration-200 hover:text-black dark:hover:text-white"
+                        >
+                          {speechStatus === 'started' ? (
+                            <StopCircle size={16} />
+                          ) : (
+                            <Volume2 size={16} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    {section.message.status === 'completed' && (
+                      <AnswerFeedback
+                        chatId={section.message.chatId}
                         messageId={section.message.messageId}
                       />
-                    </div>
-                    <div className="flex flex-row items-center -mr-2">
-                      <Copy initialMessage={parsedMessage} section={section} />
-                      <button
-                        onClick={() => {
-                          if (speechStatus === 'started') {
-                            stop();
-                          } else {
-                            start();
-                          }
-                        }}
-                        className="p-2 text-black/70 dark:text-white/70 rounded-full hover:bg-light-secondary dark:hover:bg-dark-secondary transition duration-200 hover:text-black dark:hover:text-white"
-                      >
-                        {speechStatus === 'started' ? (
-                          <StopCircle size={16} />
-                        ) : (
-                          <Volume2 size={16} />
-                        )}
-                      </button>
-                    </div>
-                  </div>
+                    )}
+                  </>
                 )}
 
                 {isLast &&

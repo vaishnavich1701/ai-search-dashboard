@@ -1,8 +1,5 @@
+import { getTrustedRequestActor } from '@/lib/requestActor';
 import { validateFeedbackOwnership, writeQueryFeedback } from '@/lib/feedback';
-import {
-  feedbackUnauthorizedResponse,
-  isFeedbackAuthorized,
-} from '@/lib/feedbackAuth';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -16,8 +13,6 @@ const bodySchema = z.object({
 });
 
 export const POST = async (req: Request) => {
-  if (!isFeedbackAuthorized(req)) return feedbackUnauthorizedResponse();
-
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return Response.json(
@@ -28,11 +23,7 @@ export const POST = async (req: Request) => {
 
   const ownership = await validateFeedbackOwnership(
     parsed.data,
-    {
-      userId: null,
-      organizationId: null,
-    },
-    { requireActorMatch: false },
+    getTrustedRequestActor(req),
   );
 
   if (!ownership.ok) {

@@ -140,7 +140,9 @@ export default function AdminEvaluationsPage() {
   const totals = summary?.totals || {};
   const quality = summary?.quality?.[0] || {};
   const total = Number(totals.total || 0);
-  const successRate = total ? (Number(totals.success || 0) / total) * 100 : null;
+  const successRate = total
+    ? (Number(totals.success || 0) / total) * 100
+    : null;
   const citationRate = total
     ? (Number(totals.withCitations || 0) / total) * 100
     : null;
@@ -179,11 +181,11 @@ export default function AdminEvaluationsPage() {
       icon: Target,
     },
     {
-      title: 'Helpfulness',
+      title: 'User-rated helpfulness',
       score: feedbackScore !== null ? pct(feedbackScore) : 'Pending',
       explanation:
         feedbackScore !== null
-          ? 'Derived from user feedback ratings to reflect whether answers were useful in practice.'
+          ? 'Derived only from explicit user Helpful / Not helpful ratings to reflect whether answers were useful in practice.'
           : 'Waiting for user feedback ratings or evaluator scores to establish helpfulness.',
       status: qualityStatus(feedbackScore),
       icon: MessageSquareHeart,
@@ -226,9 +228,9 @@ export default function AdminEvaluationsPage() {
       icon: DollarSign,
     },
     {
-      title: 'Feedback score',
+      title: 'User rating score',
       score: feedbackScore !== null ? pct(feedbackScore) : 'Pending',
-      explanation: `${fmt(quality.feedbackCount)} feedback records captured from user answer ratings.`,
+      explanation: `${fmt(quality.feedbackCount)} feedback records captured from explicit user answer ratings.`,
       status: qualityStatus(feedbackScore),
       icon: BadgeCheck,
     },
@@ -263,9 +265,9 @@ export default function AdminEvaluationsPage() {
               Evaluation metrics
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60 dark:text-white/60">
-              Monitor AI answer quality across relevance, helpfulness,
-              groundedness, hallucination risk, latency, cost efficiency,
-              feedback, and overall performance.
+              Monitor AI answer quality across relevance, user-rated
+              helpfulness, groundedness, hallucination risk, latency, cost
+              efficiency, feedback, and overall performance.
             </p>
           </div>
           <input
@@ -324,7 +326,7 @@ export default function AdminEvaluationsPage() {
                       <TrendingUp size={18} /> Recent evaluation records
                     </h2>
                     <p className="mt-1 text-xs text-black/50 dark:text-white/50">
-                      Includes available evaluation, feedback, grounding,
+                      Includes available evaluation, user rating, grounding,
                       latency, and cost signals from recent queries.
                     </p>
                   </div>
@@ -342,7 +344,7 @@ export default function AdminEvaluationsPage() {
                         <th className="px-3 py-3 font-medium">Created</th>
                         <th className="px-3 py-3 font-medium">Query</th>
                         <th className="px-3 py-3 font-medium">Evaluation</th>
-                        <th className="px-3 py-3 font-medium">Feedback</th>
+                        <th className="px-3 py-3 font-medium">User rating</th>
                         <th className="px-3 py-3 font-medium">Grounding</th>
                         <th className="px-3 py-3 font-medium">Latency</th>
                         <th className="px-3 py-3 font-medium">Cost</th>

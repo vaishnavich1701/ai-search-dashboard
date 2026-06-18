@@ -13,11 +13,17 @@ const getText = (blocks: Block[]) =>
     .map((block) => ('data' in block ? block.data : ''))
     .join('\n');
 
-export const getCitationCount = (blocks: Block[]) =>
-  blocks.reduce((count, block) => {
+export const getCitationCount = (blocks: Block[]) => {
+  const explicitSourceCount = blocks.reduce((count, block) => {
     if (block.type === 'source' && Array.isArray(block.data)) {
       return count + block.data.length;
     }
+    return count;
+  }, 0);
+
+  if (explicitSourceCount > 0) return explicitSourceCount;
+
+  return blocks.reduce((count, block) => {
     if (block.type === 'research') {
       return (
         count +
@@ -32,6 +38,7 @@ export const getCitationCount = (blocks: Block[]) =>
     }
     return count;
   }, 0);
+};
 
 export const estimateTokens = (input: {
   queryText: string;

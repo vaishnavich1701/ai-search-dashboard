@@ -167,7 +167,7 @@ export const executeSearch = async (input: {
 
       if (firstError instanceof SearxngUnavailableError) {
         emitSearchUnavailable(input);
-        return [];
+        throw firstError;
       }
 
       if (firstError) {
@@ -299,7 +299,7 @@ export const executeSearch = async (input: {
 
       if (firstError instanceof SearxngUnavailableError) {
         emitSearchUnavailable(input);
-        return [];
+        throw firstError;
       }
 
       if (firstError) {

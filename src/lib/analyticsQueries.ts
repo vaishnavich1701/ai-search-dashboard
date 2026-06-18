@@ -123,6 +123,14 @@ export const getAnalyticsSummary = (filters: Filters) => {
       "SELECT COALESCE(user_id, 'Anonymous') as userId, COALESCE(organization_id, 'None') as organizationId, COUNT(*) as total",
       'GROUP BY user_id, organization_id ORDER BY total DESC LIMIT 20',
     ),
+    byLocation: group(
+      "SELECT COALESCE(geo_country, 'Unknown') as country, COALESCE(geo_region, '') as region, COALESCE(geo_city, '') as city, COUNT(*) as total",
+      'GROUP BY geo_country, geo_region, geo_city ORDER BY total DESC LIMIT 20',
+    ),
+    byOptimizationMode: group(
+      "SELECT COALESCE(optimization_mode, 'Unknown') as mode, COUNT(*) as total",
+      'GROUP BY optimization_mode ORDER BY total DESC',
+    ),
   };
 };
 

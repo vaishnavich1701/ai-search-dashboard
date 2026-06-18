@@ -212,6 +212,9 @@ class SearchAgent {
         chatId: input.chatId,
         userId: input.analytics?.userId,
         organizationId: input.analytics?.organizationId,
+        optimizationMode: input.analytics?.optimizationMode,
+        sources: input.analytics?.sources,
+        location: input.analytics?.location,
       }).catch((analyticsErr) => {
         console.error(
           'Failed to record successful query analytics:',
@@ -232,6 +235,9 @@ class SearchAgent {
         chatId: input.chatId,
         userId: input.analytics?.userId,
         organizationId: input.analytics?.organizationId,
+        optimizationMode: input.analytics?.optimizationMode,
+        sources: input.analytics?.sources,
+        location: input.analytics?.location,
       }).catch((analyticsErr) => {
         console.error('Failed to record query analytics:', analyticsErr);
       });

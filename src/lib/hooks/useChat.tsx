@@ -13,7 +13,7 @@ import {
 import crypto from 'crypto';
 import { useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { getSuggestions } from '../actions';
+import { getApproxLocation, getSuggestions } from '../actions';
 import { MinimalProvider } from '../models/types';
 import { getAutoMediaSearch } from '../config/clientRegistry';
 import { applyPatch } from 'rfc6902';
@@ -775,6 +775,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
     const messageIndex = messages.findIndex((m) => m.messageId === messageId);
 
+    const analyticsLocation = await getApproxLocation().catch(() => null);
+
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: {
@@ -806,6 +808,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           providerId: embeddingModelProvider.providerId,
         },
         systemInstructions: localStorage.getItem('systemInstructions'),
+        analyticsLocation,
       }),
     });
 

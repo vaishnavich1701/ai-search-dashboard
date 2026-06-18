@@ -32,5 +32,9 @@ export const getApproxLocation = async () => {
     latitude: data.latitude,
     longitude: data.longitude,
     city: data.cityName,
+    region: data.regionName,
+    country: data.countryCode || data.countryName,
+    timezone: data.timeZone,
+    source: 'freeipapi',
   };
 };

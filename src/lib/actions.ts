@@ -22,9 +22,13 @@ export const getSuggestions = async (chatHistory: [string, string][]) => {
 };
 
 export const getApproxLocation = async () => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6 * 1000);
+
   const res = await fetch('https://free.freeipapi.com/api/json', {
     method: 'GET',
-  });
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeout));
 
   const data = await res.json();
 

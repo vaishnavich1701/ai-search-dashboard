@@ -442,7 +442,7 @@ export const executeSearch = async (input: {
 
       <example_output>
       {
-        "extracted_facts": "- Fact 1\n- Fact 2\n- Fact 3"
+        "extracted_facts": "- Fact 1\\n- Fact 2\\n- Fact 3"
       }
       </example_output>
       `;

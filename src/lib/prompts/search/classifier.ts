@@ -53,15 +53,15 @@ The standalone follow-up should be concise and to the point.
 You must respond in the following JSON format without any extra text, explanations or filler sentences:
 {
   "classification": {
-    "skipSearch": boolean,
-    "personalSearch": boolean,
-    "academicSearch": boolean,
-    "discussionSearch": boolean,
-    "showWeatherWidget": boolean,
-    "showStockWidget": boolean,
-    "showCalculationWidget": boolean,
+    "skipSearch": false,
+    "personalSearch": false,
+    "academicSearch": false,
+    "discussionSearch": false,
+    "showWeatherWidget": false,
+    "showStockWidget": false,
+    "showCalculationWidget": false
   },
-  "standaloneFollowUp": string
+  "standaloneFollowUp": "Self-contained version of the user query"
 }
 </output_format>
 `;

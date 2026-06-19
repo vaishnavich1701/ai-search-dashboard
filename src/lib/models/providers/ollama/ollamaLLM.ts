@@ -11,7 +11,7 @@ import { Ollama, Tool as OllamaTool, Message as OllamaMessage } from 'ollama';
 import { parse } from 'partial-json';
 import crypto from 'crypto';
 import { Message } from '@/lib/types';
-import { repairJson } from '@toolsycc/json-repair';
+import { parseStructuredJson } from '../../utils/json';
 
 type OllamaConfig = {
   baseURL: string;
@@ -207,17 +207,11 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
       },
     });
 
-    try {
-      return input.schema.parse(
-        JSON.parse(
-          repairJson(response.message.content, {
-            extractJson: true,
-          }) as string,
-        ),
-      ) as T;
-    } catch (err) {
-      throw new Error(`Error parsing response from Ollama: ${err}`);
-    }
+    return parseStructuredJson({
+      content: response.message.content,
+      schema: input.schema,
+      providerName: 'Ollama',
+    }) as T;
   }
 
   async *streamObject<T>(input: GenerateObjectInput): AsyncGenerator<T> {

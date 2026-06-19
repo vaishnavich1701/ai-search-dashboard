@@ -63,11 +63,59 @@ const bodySchema = z.object({
 
 type Body = z.infer<typeof bodySchema>;
 
+const getProviderErrorMetadata = (err: unknown) => {
+  if (!err || typeof err !== 'object') return undefined;
+  const error = 'error' in err ? (err as { error?: unknown }).error : undefined;
+  if (!error || typeof error !== 'object') return undefined;
+  return 'metadata' in error
+    ? (error as { metadata?: Record<string, unknown> }).metadata
+    : undefined;
+};
+
 const normalizeProviderError = (err: unknown) => {
   const rawMessage = err instanceof Error ? err.message : String(err);
+  const metadata = getProviderErrorMetadata(err);
+  const rawMetadata =
+    typeof metadata?.raw === 'string' ? metadata.raw : undefined;
+  const providerName =
+    typeof metadata?.provider_name === 'string'
+      ? metadata.provider_name
+      : undefined;
   const message =
-    rawMessage || 'An error occurred while processing chat request';
+    rawMetadata ||
+    rawMessage ||
+    'An error occurred while processing chat request';
   const lower = message.toLowerCase();
+  const status =
+    err && typeof err === 'object' && 'status' in err
+      ? (err as { status?: unknown }).status
+      : undefined;
+
+  if (
+    status === 429 ||
+    lower.includes('rate-limit') ||
+    lower.includes('rate limit')
+  ) {
+    return {
+      code: 'PROVIDER_RATE_LIMITED',
+      message: providerName
+        ? `${providerName} is rate-limited right now. Retry shortly, choose a different OpenRouter model/provider, or add your own provider key in OpenRouter integrations.`
+        : 'The selected provider is rate-limited right now. Retry shortly, choose a different model/provider, or add your own provider key.',
+      details: message,
+    };
+  }
+
+  if (
+    lower.includes("cannot read properties of undefined (reading 'map')") ||
+    lower.includes('structured')
+  ) {
+    return {
+      code: 'STRUCTURED_OUTPUT_FAILED',
+      message:
+        'This model/provider failed while returning structured JSON. Try a stronger instruct model or another OpenRouter provider.',
+      details: message,
+    };
+  }
 
   if (
     lower.includes('only supports chat') ||

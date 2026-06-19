@@ -26,6 +26,12 @@ type OpenAIConfig = {
   baseURL?: string;
   defaultHeaders?: Record<string, string>;
   options?: GenerateOptions;
+  /**
+   * Some OpenAI-compatible providers do not reliably support the OpenAI
+   * SDK's parsed structured-output helper. In that case we ask for JSON in
+   * the prompt and validate it locally instead.
+   */
+  structuredOutputMode?: 'native' | 'prompted-json';
 };
 
 class OpenAILLM extends BaseLLM<OpenAIConfig> {
@@ -200,6 +206,43 @@ class OpenAILLM extends BaseLLM<OpenAIConfig> {
   }
 
   async generateObject<T>(input: GenerateObjectInput): Promise<T> {
+    if (this.config.structuredOutputMode === 'prompted-json') {
+      const schemaJson = JSON.stringify(z.toJSONSchema(input.schema));
+      const response = await this.openAIClient.chat.completions.create({
+        messages: [
+          {
+            role: 'system',
+            content: `Return only valid JSON that matches this JSON schema. Do not include markdown fences or explanatory text. Schema: ${schemaJson}`,
+          },
+          ...this.convertToOpenAIMessages(input.messages),
+        ],
+        model: this.config.model,
+        temperature:
+          input.options?.temperature ?? this.config.options?.temperature ?? 1.0,
+        top_p: input.options?.topP ?? this.config.options?.topP,
+        max_completion_tokens:
+          input.options?.maxTokens ?? this.config.options?.maxTokens,
+        stop:
+          input.options?.stopSequences ?? this.config.options?.stopSequences,
+        frequency_penalty:
+          input.options?.frequencyPenalty ??
+          this.config.options?.frequencyPenalty,
+        presence_penalty:
+          input.options?.presencePenalty ??
+          this.config.options?.presencePenalty,
+      });
+
+      if (response.choices && response.choices.length > 0) {
+        return parseStructuredJson({
+          content: response.choices[0].message.content,
+          schema: input.schema,
+          providerName: 'OpenAI-compatible',
+        }) as T;
+      }
+
+      throw new Error('No response from OpenAI-compatible provider');
+    }
+
     const response = await this.openAIClient.chat.completions.parse({
       messages: this.convertToOpenAIMessages(input.messages),
       model: this.config.model,

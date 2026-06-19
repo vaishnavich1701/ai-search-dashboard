@@ -58,17 +58,20 @@ class OpenAILLM extends BaseLLM<OpenAIConfig> {
       } else if (msg.role === 'assistant') {
         return {
           role: 'assistant',
-          content: msg.content,
+          content:
+            msg.tool_calls && msg.tool_calls.length > 0 ? null : msg.content,
           ...(msg.tool_calls &&
             msg.tool_calls.length > 0 && {
-              tool_calls: msg.tool_calls?.map((tc) => ({
-                id: tc.id,
-                type: 'function',
-                function: {
-                  name: tc.name,
-                  arguments: JSON.stringify(tc.arguments),
-                },
-              })),
+              tool_calls: msg.tool_calls
+                ?.filter((tc) => tc.id && tc.name)
+                .map((tc) => ({
+                  id: tc.id,
+                  type: 'function',
+                  function: {
+                    name: tc.name,
+                    arguments: JSON.stringify(tc.arguments),
+                  },
+                })),
             }),
         } as ChatCompletionAssistantMessageParam;
       }
@@ -177,24 +180,27 @@ class OpenAILLM extends BaseLLM<OpenAIConfig> {
         yield {
           contentChunk: chunk.choices[0].delta.content || '',
           toolCallChunk:
-            toolCalls?.map((tc) => {
-              if (!recievedToolCalls[tc.index]) {
-                const call = {
-                  name: tc.function?.name!,
-                  id: tc.id!,
-                  arguments: tc.function?.arguments || '',
-                };
-                recievedToolCalls.push(call);
+            toolCalls
+              ?.map((tc) => {
+                if (!recievedToolCalls[tc.index]) {
+                  recievedToolCalls[tc.index] = {
+                    name: tc.function?.name || '',
+                    id: tc.id || '',
+                    arguments: tc.function?.arguments || '',
+                  };
+                } else {
+                  const existingCall = recievedToolCalls[tc.index];
+                  existingCall.name ||= tc.function?.name || '';
+                  existingCall.id ||= tc.id || '';
+                  existingCall.arguments += tc.function?.arguments || '';
+                }
+
+                const call = recievedToolCalls[tc.index];
+                if (!call.name || !call.id) return undefined;
+
                 return { ...call, arguments: parse(call.arguments || '{}') };
-              } else {
-                const existingCall = recievedToolCalls[tc.index];
-                existingCall.arguments += tc.function?.arguments || '';
-                return {
-                  ...existingCall,
-                  arguments: parse(existingCall.arguments),
-                };
-              }
-            }) || [],
+              })
+              .filter((tc) => tc !== undefined) || [],
           done: chunk.choices[0].finish_reason !== null,
           additionalInfo: {
             finishReason: chunk.choices[0].finish_reason,

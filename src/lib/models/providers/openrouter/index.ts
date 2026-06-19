@@ -139,6 +139,7 @@ class OpenRouterProvider extends BaseModelProvider<OpenRouterConfig> {
       model: key,
       baseURL: this.config.baseURL,
       defaultHeaders: this.getOptionalHeaders(),
+      structuredOutputMode: 'prompted-json',
     });
   }
 

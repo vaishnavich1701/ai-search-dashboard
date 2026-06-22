@@ -1,0 +1,8 @@
+messages_count|53
+chats_count|36
+query_analytics_count|35
+ran_migrations_count|6
+analytics_rows_with_feedback|5
+analytics_rows_with_evaluation|0
+analytics_rows_with_identity|0
+analytics_rows_with_geo|33

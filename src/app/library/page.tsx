@@ -47,7 +47,7 @@ const Page = () => {
             <div className="flex flex-col">
               <h1
                 className="text-5xl font-normal p-2 pb-0"
-                style={{ fontFamily: 'PP Editorial, serif' }}
+                style={{ fontFamily: 'Manrope, sans-serif' }}
               >
                 Library
               </h1>

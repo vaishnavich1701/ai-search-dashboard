@@ -82,7 +82,7 @@ const Page = () => {
               <Globe2Icon size={45} className="mb-2.5" />
               <h1
                 className="text-5xl font-normal p-2"
-                style={{ fontFamily: 'PP Editorial, serif' }}
+                style={{ fontFamily: 'Manrope, sans-serif' }}
               >
                 Discover
               </h1>

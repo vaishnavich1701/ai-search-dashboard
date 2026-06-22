@@ -35,6 +35,7 @@ const embeddingModelSchema: z.ZodType<ModelWithProvider> = z.object({
 });
 
 const analyticsLocationSchema = z.object({
+  area: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
   region: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
@@ -349,6 +350,7 @@ export const POST = async (req: Request) => {
           optimizationMode: body.optimizationMode,
           sources: body.sources,
           location: requestLocation,
+          userAgent: req.headers.get('user-agent'),
         },
         config: {
           llm,
@@ -428,6 +430,7 @@ export const POST = async (req: Request) => {
         sources: bodyForErrorLogging.sources,
         location:
           bodyForErrorLogging.analyticsLocation || getHeaderLocation(req),
+        userAgent: req.headers.get('user-agent'),
       }).catch((analyticsErr) => {
         console.error(
           'Failed to record chat request error analytics:',

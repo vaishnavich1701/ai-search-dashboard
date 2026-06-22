@@ -398,6 +398,7 @@ class SearchAgent {
             ? getSourceMetadata(responseBlocks)
             : input.analytics?.sources,
         location: input.analytics?.location,
+        userAgent: input.analytics?.userAgent,
       })
         .then(() => {
           logQueryRuntime('query log saved', {
@@ -496,6 +497,7 @@ class SearchAgent {
             ? getSourceMetadata(responseBlocks)
             : input.analytics?.sources,
         location: input.analytics?.location,
+        userAgent: input.analytics?.userAgent,
       })
         .then(() => {
           logQueryRuntime('query log saved', {

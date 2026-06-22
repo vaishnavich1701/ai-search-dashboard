@@ -59,6 +59,75 @@ const feedback = (rating: any) => {
 };
 const pct = (n: any) =>
   n === null || n === undefined ? '—' : `${Math.round(Number(n))}%`;
+
+const boundedPercent = (value: number | null | undefined, fallback = null) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return fallback;
+  }
+  return Math.max(0, Math.min(100, Number(value)));
+};
+
+const inverseLatencyScore = (latency: number | null | undefined) => {
+  if (latency === null || latency === undefined) return null;
+  return boundedPercent(100 - Math.max(0, Number(latency) - 1000) / 40);
+};
+
+const weightedAverage = (
+  parts: Array<{ score: number | null; weight: number }>,
+) => {
+  const usable = parts.filter(
+    (part) => part.score !== null && Number.isFinite(part.score),
+  ) as Array<{ score: number; weight: number }>;
+  const weight = usable.reduce((sum, part) => sum + part.weight, 0);
+  if (!weight) return null;
+  return boundedPercent(
+    usable.reduce((sum, part) => sum + part.score * part.weight, 0) / weight,
+  );
+};
+
+const rowFeedbackScore = (rating: any) => {
+  if (rating === 1) return 100;
+  if (rating === -1) return 0;
+  return null;
+};
+
+const rowCitationScore = (row: any) =>
+  row.status === 'success'
+    ? Number(row.citation_count || 0) > 0
+      ? 100
+      : 35
+    : 0;
+
+const rowLatencyScore = (row: any) => inverseLatencyScore(row.latency_ms);
+
+const rowEvaluationScore = (row: any) =>
+  row.evaluation_score === null || row.evaluation_score === undefined
+    ? null
+    : boundedPercent(Number(row.evaluation_score));
+
+const rowRelevanceScore = (row: any) =>
+  weightedAverage([
+    { score: row.status === 'success' ? 80 : 0, weight: 0.35 },
+    { score: rowCitationScore(row), weight: 0.35 },
+    { score: rowFeedbackScore(row.feedback_rating), weight: 0.2 },
+    { score: rowEvaluationScore(row), weight: 0.1 },
+  ]);
+
+const rowHelpfulnessScore = (row: any) =>
+  weightedAverage([
+    { score: rowFeedbackScore(row.feedback_rating), weight: 0.45 },
+    { score: rowEvaluationScore(row), weight: 0.25 },
+    { score: rowCitationScore(row), weight: 0.2 },
+    { score: rowLatencyScore(row), weight: 0.1 },
+  ]);
+
+const rowOverallScore = (row: any) =>
+  weightedAverage([
+    { score: rowRelevanceScore(row), weight: 0.35 },
+    { score: rowHelpfulnessScore(row), weight: 0.35 },
+    { score: rowCitationScore(row), weight: 0.15 },
+    { score: rowLatencyScore(row), weight: 0.15 },
+  ]);
 const weatherLabel = (value: any) => {
   if (!value) return '—';
 
@@ -302,13 +371,13 @@ export default function QueryLogsPage() {
                       </span>
                     </td>
                     <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 text-right dark:border-dark-200/40">
-                      {pct(r.relevance_score)}
+                      {pct(rowRelevanceScore(r))}
                     </td>
                     <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 text-right dark:border-dark-200/40">
-                      {pct(r.helpfulness_score)}
+                      {pct(rowHelpfulnessScore(r))}
                     </td>
                     <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 text-right dark:border-dark-200/40">
-                      {pct(r.evaluation_score)}
+                      {pct(rowOverallScore(r))}
                     </td>
                     <td className="min-w-40 border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
                       {[r.browser, r.os].filter(Boolean).join(' / ') || '—'}

@@ -20,14 +20,69 @@ const ms = (n: any) =>
     : `${Math.round(Number(n)).toLocaleString()} ms`;
 const coord = (n: any) =>
   n === null || n === undefined ? null : (Number(n) / 1_000_000).toFixed(4);
-const locationLabel = (r: any) =>
-  [r.geo_city, r.geo_region, r.geo_country].filter(Boolean).join(', ') || '—';
+const dateValue = (value: any) => (value ? new Date(value) : null);
+const dateOnly = (value: any) => {
+  const date = dateValue(value);
+  return date ? date.toLocaleDateString() : '—';
+};
+const timeOnly = (value: any, timeZone?: string) => {
+  const date = dateValue(value);
+  return date
+    ? date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZone,
+      })
+    : '—';
+};
+const locationValue = (value: any) => value || '—';
 const sourcesLabel = (r: any) => {
+  if (r.source_count !== null && r.source_count !== undefined)
+    return fmt(r.source_count);
+
   try {
     const sources = JSON.parse(r.sources || '[]');
-    return Array.isArray(sources) && sources.length ? sources.join(', ') : '—';
+    return Array.isArray(sources) ? fmt(sources.length) : '—';
   } catch {
-    return r.sources || '—';
+    return r.sources ? '1' : '—';
+  }
+};
+const cost = (n: any) =>
+  n === null || n === undefined
+    ? '—'
+    : `$${(Number(n) / 1_000_000).toFixed(6)}`;
+const feedback = (rating: any) => {
+  if (rating === 1) return 'Helpful';
+  if (rating === -1) return 'Not helpful';
+  return '—';
+};
+const pct = (n: any) =>
+  n === null || n === undefined ? '—' : `${Math.round(Number(n))}%`;
+const weatherLabel = (value: any) => {
+  if (!value) return '—';
+
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    const current = parsed.current ?? {};
+    const units = parsed.units ?? {};
+    const temp = current.temperature_2m;
+    const humidity = current.relative_humidity_2m;
+    const wind = current.wind_speed_10m;
+
+    return (
+      [
+        temp === undefined ? null : `${temp}${units.temperature_2m || '°C'}`,
+        humidity === undefined
+          ? null
+          : `${humidity}${units.relative_humidity_2m || '%'} RH`,
+        wind === undefined ? null : `${wind}${units.wind_speed_10m || ''} wind`,
+      ]
+        .filter(Boolean)
+        .join(' · ') || '—'
+    );
+  } catch {
+    return '—';
   }
 };
 
@@ -76,7 +131,7 @@ export default function QueryLogsPage() {
           </h1>
           <p className="mt-1 text-sm text-black/60 dark:text-white/60">
             Audit who searched, their organization, what they searched, query
-            mode, sources, and approximate geolocation.
+            mode, source counts, context, feedback, and geolocation.
           </p>
         </div>
 
@@ -131,59 +186,143 @@ export default function QueryLogsPage() {
         )}
 
         <section className="mt-6 overflow-x-auto rounded-2xl border border-light-200 p-4 dark:border-dark-200">
-          <table className="w-full min-w-[1200px] text-left text-sm">
-            <thead className="text-xs text-black/50 dark:text-white/50">
+          <table className="w-full min-w-[2600px] border-separate border-spacing-0 text-left text-xs">
+            <thead className="text-[11px] uppercase tracking-wide text-black/50 dark:text-white/50">
               <tr>
-                <th>Created</th>
-                <th>User</th>
-                <th>Org</th>
-                <th>Search</th>
-                <th>Location</th>
-                <th>Coordinates</th>
-                <th>Mode</th>
-                <th>Sources</th>
-                <th>Model</th>
-                <th>Status</th>
-                <th>Latency</th>
-                <th>Error</th>
+                {[
+                  'Date created',
+                  'Time (GMT)',
+                  'Local time',
+                  'Area',
+                  'City',
+                  'State',
+                  'Country',
+                  'Query',
+                  'Weather then',
+                  'Mode',
+                  'Sources',
+                  'LLM model',
+                  'Status',
+                  'Latency',
+                  'Cost',
+                  'Error',
+                  'Explicit feedback',
+                  'Feedback note',
+                  'Relevance',
+                  'Helpfulness',
+                  'Overall',
+                  'Browser/OS',
+                  'Device',
+                  'Coordinates',
+                ].map((heading) => (
+                  <th
+                    key={heading}
+                    className="whitespace-nowrap px-4 py-3 font-semibold"
+                  >
+                    {heading}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="align-top">
               {logs?.rows?.length ? (
                 logs.rows.map((r) => (
                   <tr
                     key={r.id}
                     className="border-t border-light-200/40 dark:border-dark-200/40"
                   >
-                    <td className="py-2">
-                      {new Date(r.created_at).toLocaleString()}
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {dateOnly(r.created_at)}
                     </td>
-                    <td>{r.user_id || 'Anonymous'}</td>
-                    <td>{r.organization_id || 'None'}</td>
-                    <td className="max-w-sm truncate" title={r.query_text}>
-                      {r.query_text}
-                      {r.query_text_truncated ? ' (truncated)' : ''}
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {timeOnly(r.created_at, 'GMT')}
                     </td>
-                    <td>
-                      {locationLabel(r)}
-                      <span className="block text-xs text-black/50 dark:text-white/50">
-                        {r.geo_source || '—'}
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {timeOnly(r.created_at, r.geo_timezone || undefined)}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {locationValue(r.geo_area)}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {locationValue(r.geo_city)}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {locationValue(r.geo_region)}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {locationValue(r.geo_country)}
+                    </td>
+                    <td
+                      className="max-w-sm border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40"
+                      title={r.query_text}
+                    >
+                      <span className="line-clamp-3">
+                        {r.query_text}
+                        {r.query_text_truncated ? ' (truncated)' : ''}
                       </span>
                     </td>
-                    <td>
+                    <td className="min-w-48 border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {weatherLabel(r.weather_data)}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {r.optimization_mode || '—'}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 text-right dark:border-dark-200/40">
+                      {sourcesLabel(r)}
+                    </td>
+                    <td className="min-w-56 border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {r.provider || '—'}/{r.model || '—'}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {r.status}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 text-right dark:border-dark-200/40">
+                      {ms(r.latency_ms)}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 text-right dark:border-dark-200/40">
+                      {cost(r.estimated_cost)}
+                    </td>
+                    <td
+                      className="max-w-xs border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40"
+                      title={r.error_message || ''}
+                    >
+                      <span className="line-clamp-3">
+                        {r.error_message || '—'}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {feedback(r.feedback_rating)}
+                    </td>
+                    <td
+                      className="max-w-xs border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40"
+                      title={r.feedback_text || ''}
+                    >
+                      <span className="line-clamp-3">
+                        {r.feedback_text || '—'}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 text-right dark:border-dark-200/40">
+                      {pct(r.relevance_score)}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 text-right dark:border-dark-200/40">
+                      {pct(r.helpfulness_score)}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 text-right dark:border-dark-200/40">
+                      {pct(r.evaluation_score)}
+                    </td>
+                    <td className="min-w-40 border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {[r.browser, r.os].filter(Boolean).join(' / ') || '—'}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {r.device || '—'}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
                       {[coord(r.geo_latitude), coord(r.geo_longitude)]
                         .filter(Boolean)
                         .join(', ') || '—'}
-                    </td>
-                    <td>{r.optimization_mode || '—'}</td>
-                    <td>{sourcesLabel(r)}</td>
-                    <td>
-                      {r.provider || '—'}/{r.model || '—'}
-                    </td>
-                    <td>{r.status}</td>
-                    <td>{ms(r.latency_ms)}</td>
-                    <td className="max-w-xs truncate">
-                      {r.error_message || '—'}
+                      <span className="block text-[11px] text-black/50 dark:text-white/50">
+                        {r.geo_source || '—'}
+                      </span>
                     </td>
                   </tr>
                 ))
@@ -191,7 +330,7 @@ export default function QueryLogsPage() {
                 <tr>
                   <td
                     className="py-6 text-center text-black/60 dark:text-white/60"
-                    colSpan={12}
+                    colSpan={24}
                   >
                     No query logs yet.
                   </td>

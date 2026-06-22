@@ -30,6 +30,7 @@ export type SearchAgentInput = {
     optimizationMode?: string | null;
     sources?: string[] | null;
     location?: {
+      area?: string | null;
       city?: string | null;
       region?: string | null;
       country?: string | null;
@@ -38,6 +39,7 @@ export type SearchAgentInput = {
       timezone?: string | null;
       source?: string | null;
     } | null;
+    userAgent?: string | null;
   };
 };
 

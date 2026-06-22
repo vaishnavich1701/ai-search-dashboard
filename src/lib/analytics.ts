@@ -59,6 +59,83 @@ export const estimateTokens = (input: {
   };
 };
 
+const getWeatherAtLocation = async (
+  location?: { latitude?: number | null; longitude?: number | null } | null,
+) => {
+  if (location?.latitude === undefined || location.latitude === null)
+    return null;
+  if (location?.longitude === undefined || location.longitude === null)
+    return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+
+  try {
+    const response = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m&timezone=auto`,
+      { signal: controller.signal },
+    );
+
+    if (!response.ok) return null;
+    const data = await response.json();
+
+    return JSON.stringify({
+      current: data.current ?? null,
+      units: data.current_units ?? null,
+      timezone: data.timezone ?? null,
+    });
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+export const getClientContext = (userAgent?: string | null) => {
+  const ua = userAgent || '';
+  const lower = ua.toLowerCase();
+  const browser = lower.includes('edg/')
+    ? 'Edge'
+    : lower.includes('opr/') || lower.includes('opera')
+      ? 'Opera'
+      : lower.includes('chrome/') || lower.includes('crios/')
+        ? 'Chrome'
+        : lower.includes('firefox/') || lower.includes('fxios/')
+          ? 'Firefox'
+          : lower.includes('safari/')
+            ? 'Safari'
+            : ua
+              ? 'Unknown'
+              : null;
+  const os = lower.includes('windows')
+    ? 'Windows'
+    : lower.includes('mac os x') || lower.includes('macintosh')
+      ? 'macOS'
+      : lower.includes('android')
+        ? 'Android'
+        : lower.includes('iphone') ||
+            lower.includes('ipad') ||
+            lower.includes('ios')
+          ? 'iOS/iPadOS'
+          : lower.includes('linux')
+            ? 'Linux'
+            : ua
+              ? 'Unknown'
+              : null;
+  const device =
+    lower.includes('mobile') ||
+    lower.includes('iphone') ||
+    lower.includes('android')
+      ? 'mobile'
+      : lower.includes('ipad') || lower.includes('tablet')
+        ? 'tablet'
+        : ua
+          ? 'laptop/desktop'
+          : null;
+
+  return { browser, os, device };
+};
+
 export const estimateCostMicroUsd = () => {
   // No model pricing metadata exists in this app today. Keep the persisted value
   // null rather than inventing costs. This function is intentionally centralized
@@ -83,6 +160,7 @@ export const recordQueryAnalytics = async (input: {
   optimizationMode?: string | null;
   sources?: unknown[] | null;
   location?: {
+    area?: string | null;
     city?: string | null;
     region?: string | null;
     country?: string | null;
@@ -91,6 +169,7 @@ export const recordQueryAnalytics = async (input: {
     timezone?: string | null;
     source?: string | null;
   } | null;
+  userAgent?: string | null;
 }) => {
   const completedAt = input.completedAt ?? new Date();
   const latencyMs = Math.max(
@@ -101,6 +180,9 @@ export const recordQueryAnalytics = async (input: {
     queryText: input.queryText,
     responseBlocks: input.responseBlocks,
   });
+
+  const weatherData = await getWeatherAtLocation(input.location);
+  const clientContext = getClientContext(input.userAgent);
 
   await db.insert(queryAnalytics).values({
     id: crypto.randomUUID(),
@@ -129,6 +211,7 @@ export const recordQueryAnalytics = async (input: {
     sourceCount: input.responseBlocks
       ? getCitationCount(input.responseBlocks)
       : (input.sources?.length ?? null),
+    geoArea: input.location?.area ?? null,
     geoCity: input.location?.city ?? null,
     geoRegion: input.location?.region ?? null,
     geoCountry: input.location?.country ?? null,
@@ -144,6 +227,11 @@ export const recordQueryAnalytics = async (input: {
         : Math.round(input.location.longitude * 1_000_000),
     geoTimezone: input.location?.timezone ?? null,
     geoSource: input.location?.source ?? null,
+    weatherData,
+    userAgent: input.userAgent ?? null,
+    browser: clientContext.browser,
+    os: clientContext.os,
+    device: clientContext.device,
     createdAt: new Date().toISOString(),
   });
 };

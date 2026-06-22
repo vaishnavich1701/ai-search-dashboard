@@ -28,12 +28,13 @@ const dateOnly = (value: any) => {
 const timeOnly = (value: any, timeZone?: string) => {
   const date = dateValue(value);
   return date
-    ? date.toLocaleTimeString([], {
+    ? new Intl.DateTimeFormat([], {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
+        fractionalSecondDigits: 3,
         timeZone,
-      })
+      }).format(date)
     : '—';
 };
 const locationValue = (value: any) => value || '—';
@@ -59,6 +60,176 @@ const feedback = (rating: any) => {
 };
 const pct = (n: any) =>
   n === null || n === undefined ? '—' : `${Math.round(Number(n))}%`;
+
+const normalizeCountry = (value: any) =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
+
+const NAM_COUNTRIES = new Set([
+  'ai',
+  'ag',
+  'aw',
+  'bs',
+  'bb',
+  'bz',
+  'bm',
+  'vg',
+  'ca',
+  'ky',
+  'cr',
+  'cu',
+  'cw',
+  'dm',
+  'do',
+  'sv',
+  'gl',
+  'gd',
+  'gp',
+  'gt',
+  'ht',
+  'hn',
+  'jm',
+  'mq',
+  'mx',
+  'ms',
+  'ni',
+  'pa',
+  'pr',
+  'bl',
+  'kn',
+  'lc',
+  'mf',
+  'pm',
+  'vc',
+  'sx',
+  'tt',
+  'tc',
+  'us',
+  'usa',
+  'united states',
+  'united states of america',
+  'virgin islands, u.s.',
+]);
+
+const APAC_COUNTRIES = new Set([
+  'af',
+  'as',
+  'au',
+  'bd',
+  'bt',
+  'bn',
+  'kh',
+  'cn',
+  'ck',
+  'fj',
+  'pf',
+  'gu',
+  'hk',
+  'in',
+  'id',
+  'jp',
+  'ki',
+  'la',
+  'mo',
+  'my',
+  'mv',
+  'mh',
+  'fm',
+  'mn',
+  'mm',
+  'nr',
+  'np',
+  'nc',
+  'nz',
+  'nu',
+  'mp',
+  'pk',
+  'pw',
+  'pg',
+  'ph',
+  'pn',
+  'ws',
+  'sg',
+  'sb',
+  'kr',
+  'lk',
+  'tw',
+  'th',
+  'tl',
+  'to',
+  'tv',
+  'vu',
+  'vn',
+  'australia',
+  'china',
+  'india',
+  'japan',
+  'new zealand',
+  'singapore',
+]);
+
+const marketRegion = (country: any) => {
+  const normalized = normalizeCountry(country);
+  if (!normalized) return '—';
+  if (NAM_COUNTRIES.has(normalized)) return 'NAM';
+  if (APAC_COUNTRIES.has(normalized)) return 'APAC';
+  return 'EMEA';
+};
+
+const calendarQuarter = (date: Date) =>
+  `Q${Math.floor(date.getUTCMonth() / 3) + 1} ${date.getUTCFullYear()}`;
+
+const ukTaxQuarter = (date: Date) => {
+  const year = date.getUTCFullYear();
+  const taxYearStart = Date.UTC(year, 3, 6);
+  const taxYear = date.getTime() >= taxYearStart ? year : year - 1;
+  const quarterStarts = [
+    Date.UTC(taxYear, 3, 6),
+    Date.UTC(taxYear, 6, 6),
+    Date.UTC(taxYear, 9, 6),
+    Date.UTC(taxYear + 1, 0, 6),
+  ];
+  const time = date.getTime();
+  const quarter = quarterStarts.reduce(
+    (current, start, index) => (time >= start ? index + 1 : current),
+    4,
+  );
+
+  return `Q${quarter} ${taxYear}/${String(taxYear + 1).slice(-2)}`;
+};
+
+const taxQuarterLabel = (value: any) => {
+  const date = dateValue(value);
+  return date ? `US ${calendarQuarter(date)} · UK ${ukTaxQuarter(date)}` : '—';
+};
+
+const networkInfo = (row: any) => {
+  const parts = [
+    row.network_type,
+    row.connection_type,
+    row.effective_connection_type,
+    row.downlink_mbps ? `${row.downlink_mbps} Mbps` : null,
+    row.rtt_ms ? `${row.rtt_ms} ms RTT` : null,
+    row.ip_address ? `IP ${row.ip_address}` : null,
+  ].filter(Boolean);
+
+  return parts.length ? parts.join(' · ') : 'Not captured';
+};
+
+const interactionInfo = (row: any) => {
+  const parts = [
+    row.click_count !== null && row.click_count !== undefined
+      ? `${fmt(row.click_count)} clicks`
+      : null,
+    row.interaction_count !== null && row.interaction_count !== undefined
+      ? `${fmt(row.interaction_count)} interactions`
+      : null,
+    row.last_interaction_type,
+  ].filter(Boolean);
+
+  return parts.length ? parts.join(' · ') : 'Not captured';
+};
 
 const boundedPercent = (value: number | null | undefined, fallback = null) => {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
@@ -266,6 +437,10 @@ export default function QueryLogsPage() {
                   'City',
                   'State',
                   'Country',
+                  'Region',
+                  'Tax quarter',
+                  'Network information',
+                  'Click and interaction data',
                   'Query',
                   'Weather then',
                   'Mode',
@@ -320,6 +495,18 @@ export default function QueryLogsPage() {
                     </td>
                     <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
                       {locationValue(r.geo_country)}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {marketRegion(r.geo_country)}
+                    </td>
+                    <td className="whitespace-nowrap border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {taxQuarterLabel(r.created_at)}
+                    </td>
+                    <td className="min-w-56 border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {networkInfo(r)}
+                    </td>
+                    <td className="min-w-56 border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40">
+                      {interactionInfo(r)}
                     </td>
                     <td
                       className="max-w-sm border-t border-light-200/40 px-4 py-3 dark:border-dark-200/40"
@@ -399,7 +586,7 @@ export default function QueryLogsPage() {
                 <tr>
                   <td
                     className="py-6 text-center text-black/60 dark:text-white/60"
-                    colSpan={24}
+                    colSpan={28}
                   >
                     No query logs yet.
                   </td>

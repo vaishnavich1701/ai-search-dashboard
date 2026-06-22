@@ -61,6 +61,92 @@ const inverseLatencyScore = (latency: number | null | undefined) => {
   return boundedPercent(100 - Math.max(0, Number(latency) - 1000) / 40);
 };
 
+const scoreText = (score: number | null) =>
+  score === null ? 'No query logs yet' : `${Math.round(score)}/100`;
+
+const weightedAverage = (
+  parts: Array<{ score: number | null; weight: number }>,
+) => {
+  const usable = parts.filter(
+    (part) => part.score !== null && Number.isFinite(part.score),
+  ) as Array<{ score: number; weight: number }>;
+  const weight = usable.reduce((sum, part) => sum + part.weight, 0);
+  if (!weight) return null;
+  return boundedPercent(
+    usable.reduce((sum, part) => sum + part.score * part.weight, 0) / weight,
+  );
+};
+
+const feedbackScore = (helpfulRate: number | null, feedbackCount: number) => {
+  if (helpfulRate === null) return null;
+  const confidence = Math.min(1, feedbackCount / 10);
+  return boundedPercent(50 + (helpfulRate - 50) * confidence);
+};
+
+const successScore = (totals: any, total: number) =>
+  total ? boundedPercent((Number(totals.success || 0) / total) * 100) : null;
+
+const citationScore = (totals: any, total: number) =>
+  total
+    ? boundedPercent((Number(totals.withCitations || 0) / total) * 100)
+    : null;
+
+const evaluationScore = (quality: any) =>
+  Number(quality.evaluationCount || 0)
+    ? boundedPercent(Number(quality.avgEvaluation))
+    : null;
+
+const rowFeedbackScore = (rating: any) => {
+  if (rating === 1) return 100;
+  if (rating === -1) return 0;
+  return null;
+};
+
+const rowCitationScore = (row: any) =>
+  row.status === 'success'
+    ? Number(row.citation_count || 0) > 0
+      ? 100
+      : 35
+    : 0;
+
+const rowLatencyScore = (row: any) => inverseLatencyScore(row.latency_ms);
+
+const rowRelevanceScore = (row: any) =>
+  weightedAverage([
+    { score: row.status === 'success' ? 80 : 0, weight: 0.35 },
+    { score: rowCitationScore(row), weight: 0.35 },
+    { score: rowFeedbackScore(row.feedback_rating), weight: 0.2 },
+    {
+      score:
+        row.evaluation_score === null || row.evaluation_score === undefined
+          ? null
+          : boundedPercent(Number(row.evaluation_score)),
+      weight: 0.1,
+    },
+  ]);
+
+const rowHelpfulnessScore = (row: any) =>
+  weightedAverage([
+    { score: rowFeedbackScore(row.feedback_rating), weight: 0.45 },
+    {
+      score:
+        row.evaluation_score === null || row.evaluation_score === undefined
+          ? null
+          : boundedPercent(Number(row.evaluation_score)),
+      weight: 0.25,
+    },
+    { score: rowCitationScore(row), weight: 0.2 },
+    { score: rowLatencyScore(row), weight: 0.1 },
+  ]);
+
+const rowOverallScore = (row: any) =>
+  weightedAverage([
+    { score: rowRelevanceScore(row), weight: 0.35 },
+    { score: rowHelpfulnessScore(row), weight: 0.35 },
+    { score: rowCitationScore(row), weight: 0.15 },
+    { score: rowLatencyScore(row), weight: 0.15 },
+  ]);
+
 const statusClasses: Record<Metric['status'], string> = {
   Excellent:
     'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
@@ -148,6 +234,28 @@ export default function AdminEvaluationsPage() {
     ? (helpfulCount / feedbackCount) * 100
     : null;
   const latencyScore = inverseLatencyScore(totals.avgLatency);
+  const successRateScore = successScore(totals, total);
+  const citationRateScore = citationScore(totals, total);
+  const avgEvaluationScore = evaluationScore(quality);
+  const inferredFeedbackScore = feedbackScore(helpfulRate, feedbackCount);
+  const relevanceScore = weightedAverage([
+    { score: successRateScore, weight: 0.4 },
+    { score: citationRateScore, weight: 0.35 },
+    { score: inferredFeedbackScore, weight: 0.15 },
+    { score: avgEvaluationScore, weight: 0.1 },
+  ]);
+  const helpfulnessScore = weightedAverage([
+    { score: inferredFeedbackScore, weight: 0.45 },
+    { score: avgEvaluationScore, weight: 0.25 },
+    { score: citationRateScore, weight: 0.2 },
+    { score: latencyScore, weight: 0.1 },
+  ]);
+  const overallQualityScore = weightedAverage([
+    { score: relevanceScore, weight: 0.35 },
+    { score: helpfulnessScore, weight: 0.35 },
+    { score: citationRateScore, weight: 0.15 },
+    { score: latencyScore, weight: 0.15 },
+  ]);
   const costAvailable = totals.avgCost !== null && totals.avgCost !== undefined;
 
   const feedbackSummary = feedbackCount
@@ -173,18 +281,22 @@ export default function AdminEvaluationsPage() {
   const metrics: Metric[] = [
     {
       title: 'Relevance',
-      score: 'Not evaluated yet',
+      score: scoreText(relevanceScore),
       explanation:
-        'No dedicated relevance evaluation field is exposed by the current database/API, so this page does not infer relevance from other signals.',
-      status: 'Waiting',
+        relevanceScore === null
+          ? 'No logged queries are available yet. Relevance will be scored from successful answers, citation/source coverage, explicit feedback, and any stored evaluator score.'
+          : `Composite proxy from success rate (${pct(successRateScore)}), citation coverage (${pct(citationRateScore)}), feedback confidence (${pct(inferredFeedbackScore)}), and stored evaluator average (${pct(avgEvaluationScore)}).`,
+      status: qualityStatus(relevanceScore),
       icon: Target,
     },
     {
       title: 'Helpfulness',
-      score: 'Not evaluated yet',
+      score: scoreText(helpfulnessScore),
       explanation:
-        'No dedicated evaluator-scored helpfulness field is stored. Explicit Helpful / Not helpful clicks are shown separately as user feedback.',
-      status: 'Waiting',
+        helpfulnessScore === null
+          ? 'No logged queries are available yet. Helpfulness will be scored from user feedback, evaluator scores, citation coverage, and latency.'
+          : `Composite proxy from feedback confidence (${pct(inferredFeedbackScore)}), evaluator average (${pct(avgEvaluationScore)}), citation coverage (${pct(citationRateScore)}), and latency score (${pct(latencyScore)}).`,
+      status: qualityStatus(helpfulnessScore),
       icon: MessageSquareHeart,
     },
     {
@@ -236,10 +348,12 @@ export default function AdminEvaluationsPage() {
     },
     {
       title: 'Overall quality',
-      score: 'Not evaluated yet',
+      score: scoreText(overallQualityScore),
       explanation:
-        'No dedicated overall quality evaluation field is exposed by the current database/API, so no composite quality score is calculated.',
-      status: 'Waiting',
+        overallQualityScore === null
+          ? 'No logged queries are available yet. Overall quality combines relevance, helpfulness, grounding/citations, and latency once data exists.'
+          : `Weighted composite of relevance (${scoreText(relevanceScore)}), helpfulness (${scoreText(helpfulnessScore)}), grounding (${pct(citationRateScore)}), and latency (${pct(latencyScore)}).`,
+      status: qualityStatus(overallQualityScore),
       icon: Target,
     },
   ];
@@ -263,10 +377,10 @@ export default function AdminEvaluationsPage() {
               Evaluation metrics
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60 dark:text-white/60">
-              Monitor AI answer quality without inferred scores: real evaluation
-              fields remain marked as not evaluated, explicit user feedback is
-              counted directly, and citation-based signals are labeled as
-              proxies.
+              Monitor AI answer quality with transparent composite proxy scores
+              for relevance, helpfulness, and overall quality. Explicit user
+              feedback is counted directly, while citation, success, evaluator,
+              and latency signals are labeled as inputs.
             </p>
           </div>
           <input
@@ -314,7 +428,7 @@ export default function AdminEvaluationsPage() {
                   No query logs, explicit feedback, or evaluation records exist
                   yet. Once users submit feedback or evaluation jobs store
                   dedicated scores, this page will show those real signals
-                  without inventing quality percentages.
+                  without hiding which signals feed each score.
                 </p>
               </section>
             ) : (
@@ -338,7 +452,7 @@ export default function AdminEvaluationsPage() {
                   </Link>
                 </div>
                 <div className="overflow-x-auto rounded-xl border border-light-200/40 dark:border-dark-200/40">
-                  <table className="w-full min-w-[1040px] table-fixed text-left text-sm">
+                  <table className="w-full min-w-[1280px] table-fixed text-left text-sm">
                     <thead className="text-xs text-black/50 dark:text-white/50">
                       <tr>
                         <th className="px-3 py-3 font-medium">Created</th>
@@ -352,6 +466,9 @@ export default function AdminEvaluationsPage() {
                         </th>
                         <th className="px-3 py-3 font-medium">Latency</th>
                         <th className="px-3 py-3 font-medium">Cost status</th>
+                        <th className="px-3 py-3 font-medium">Relevance</th>
+                        <th className="px-3 py-3 font-medium">Helpfulness</th>
+                        <th className="px-3 py-3 font-medium">Overall</th>
                         <th className="px-3 py-3 font-medium">
                           Evaluation status
                         </th>
@@ -389,6 +506,15 @@ export default function AdminEvaluationsPage() {
                               {costStatus(r.estimated_cost)}
                             </td>
                             <td className="px-3 py-4 align-top">
+                              {scoreText(rowRelevanceScore(r))}
+                            </td>
+                            <td className="px-3 py-4 align-top">
+                              {scoreText(rowHelpfulnessScore(r))}
+                            </td>
+                            <td className="px-3 py-4 align-top">
+                              {scoreText(rowOverallScore(r))}
+                            </td>
+                            <td className="px-3 py-4 align-top">
                               {evaluationStatus(r)}
                             </td>
                           </tr>
@@ -397,7 +523,7 @@ export default function AdminEvaluationsPage() {
                         <tr>
                           <td
                             className="px-3 py-6 text-center text-black/60 dark:text-white/60"
-                            colSpan={8}
+                            colSpan={11}
                           >
                             No recent evaluation records yet.
                           </td>

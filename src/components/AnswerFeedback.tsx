@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ThumbsDown, ThumbsUp } from 'lucide-react';
+import { toast } from 'sonner';
 
 type FeedbackStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -20,10 +21,29 @@ const AnswerFeedback = ({
   const [selectedRating, setSelectedRating] = useState<1 | -1 | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
   const [status, setStatus] = useState<FeedbackStatus>('idle');
+  const [isOpen, setIsOpen] = useState(true);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const submitFeedback = async (rating: 1 | -1, text = feedbackText) => {
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const submitFeedback = async (
+    rating: 1 | -1,
+    text = feedbackText,
+    { closeAfterSave = false }: { closeAfterSave?: boolean } = {},
+  ) => {
     setSelectedRating(rating);
     setStatus('saving');
+
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
 
     try {
       const res = await fetch('/api/feedback', {
@@ -43,11 +63,24 @@ const AnswerFeedback = ({
       }
 
       setStatus('saved');
+      toast.success('Feedback saved. Thanks for the note.');
+
+      if (closeAfterSave) {
+        closeTimeoutRef.current = setTimeout(() => {
+          setIsOpen(false);
+          closeTimeoutRef.current = null;
+        }, 900);
+      }
     } catch (error) {
       console.error('Failed to submit feedback:', error);
       setStatus('error');
+      toast.error('Feedback could not be saved. Please try again later.');
     }
   };
+
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div className="mt-2 rounded-xl border border-light-200/60 bg-light-secondary/40 p-3 text-sm dark:border-dark-200/60 dark:bg-dark-secondary/40">
@@ -86,14 +119,17 @@ const AnswerFeedback = ({
           <input
             value={feedbackText}
             onChange={(event) => setFeedbackText(event.target.value)}
-            onBlur={() => submitFeedback(selectedRating, feedbackText)}
             maxLength={2000}
             placeholder="Optional: tell us why"
             className="min-w-0 flex-1 rounded-lg border border-light-200 bg-transparent px-3 py-2 text-xs outline-none focus:border-sky-500 dark:border-dark-200"
           />
           <button
             type="button"
-            onClick={() => submitFeedback(selectedRating, feedbackText)}
+            onClick={() =>
+              submitFeedback(selectedRating, feedbackText, {
+                closeAfterSave: true,
+              })
+            }
             disabled={status === 'saving'}
             className="rounded-lg bg-sky-500 px-3 py-2 text-xs font-medium text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -104,7 +140,7 @@ const AnswerFeedback = ({
 
       {status === 'saved' && (
         <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-300">
-          Thanks — your rating was saved.
+          Thanks — your feedback was saved.
         </p>
       )}
       {status === 'error' && (

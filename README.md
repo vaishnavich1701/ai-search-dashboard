@@ -1,270 +1,199 @@
-# Vane 🔍
+# AI Search Dashboard
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/ItzCrazyKns/Vane?style=social)](https://github.com/ItzCrazyKns/Vane/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/ItzCrazyKns/Vane?style=social)](https://github.com/ItzCrazyKns/Vane/network/members)
-[![GitHub watchers](https://img.shields.io/github/watchers/ItzCrazyKns/Vane?style=social)](https://github.com/ItzCrazyKns/Vane/watchers)
-[![Docker Pulls](https://img.shields.io/docker/pulls/itzcrazykns1337/vane?color=blue)](https://hub.docker.com/r/itzcrazykns1337/vane)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/ItzCrazyKns/Vane/blob/master/LICENSE)
-[![GitHub last commit](https://img.shields.io/github/last-commit/ItzCrazyKns/Vane?color=green)](https://github.com/ItzCrazyKns/Vane/commits/master)
-[![Discord](https://dcbadge.limes.pink/api/server/26aArMy8tT?style=flat)](https://discord.gg/26aArMy8tT)
+AI Search Dashboard is a self-hosted AI search and answer dashboard. It combines web search with chat models so users can ask questions, review cited sources, upload documents, and manage model-provider connections from the application settings.
 
-Vane is a **privacy-focused AI answering engine** that runs entirely on your own hardware. It combines knowledge from the vast internet with support for **local LLMs** (Ollama) and cloud providers (OpenAI, Claude, Groq, OpenRouter), delivering accurate answers with **cited sources** while keeping your searches completely private.
+This project is based on Vane and includes support for local and hosted model providers such as Ollama, OpenAI-compatible servers, OpenRouter, Groq, Gemini, Anthropic, LM Studio, and others.
 
-![preview](.assets/vane-screenshot.png)
+## Features
 
-Want to know more about its architecture and how it works? You can read it [here](https://github.com/ItzCrazyKns/Vane/tree/master/docs/architecture/README.md).
+- AI-powered search with cited sources.
+- Multiple search modes for speed, balanced answers, or higher-quality research.
+- Model-provider setup from the web UI.
+- Web search through bundled SearxNG when using the full Docker image.
+- Optional connection to your own SearxNG instance.
+- Chat history stored locally in the app data directory.
+- File uploads for asking questions about documents.
+- Widgets for useful lookups such as weather, calculations, and stocks.
+- Admin analytics pages protected by an admin token.
 
-## ✨ Features
+## Startup Commands
 
-🤖 **Support for all major AI providers** - Use local LLMs through Ollama or connect to OpenAI, Anthropic Claude, Google Gemini, Groq, OpenRouter, and more. Mix and match models based on your needs.
+Docker is the recommended way to run the application.
 
-⚡ **Smart search modes** - Choose Speed Mode when you need quick answers, Balanced Mode for everyday searches, or Quality Mode for deep research.
+### Option 1: Docker Compose
 
-🧭 **Pick your sources** - Search the web, discussions, or academic papers. More sources and integrations are in progress.
+1. Copy the example environment file:
 
-🧩 **Widgets** - Helpful UI cards that show up when relevant, like weather, calculations, stock prices, and other quick lookups.
+   ```bash
+   cp .env.example .env
+   ```
 
-🔍 **Web search powered by SearxNG** - Access multiple search engines while keeping your identity private. Support for Tavily and Exa coming soon for even better results.
+2. Edit `.env` and set a strong admin analytics token:
 
-📷 **Image and video search** - Find visual content alongside text results. Search isn't limited to just articles anymore.
+   ```bash
+   ADMIN_ANALYTICS_TOKEN=replace-with-a-long-random-secret
+   ```
 
-📄 **File uploads** - Upload documents and ask questions about them. PDFs, text files, images - Vane understands them all.
+3. Build and start the app:
 
-🌐 **Search specific domains** - Limit your search to specific websites when you know where to look. Perfect for technical documentation or research papers.
+   ```bash
+   docker compose up --build -d
+   ```
 
-💡 **Smart suggestions** - Get intelligent search suggestions as you type, helping you formulate better queries.
+4. Open the app:
 
-📚 **Discover** - Browse interesting articles and trending content throughout the day. Stay informed without even searching.
+   ```text
+   http://localhost:3000
+   ```
 
-🕒 **Search history** - Every search is saved locally so you can revisit your discoveries anytime. Your research is never lost.
+5. View logs if needed:
 
-✨ **More coming soon** - We're actively developing new features based on community feedback. Join our Discord to help shape Vane's future!
+   ```bash
+   docker compose logs -f vane
+   ```
 
-## Sponsors
+6. Stop the app:
 
-Vane's development is powered by the generous support of our sponsors. Their contributions help keep this project free, open-source, and accessible to everyone.
+   ```bash
+   docker compose down
+   ```
 
-<div align="center">
-  
-  
-<a href="https://www.warp.dev/perplexica">
-  <img alt="Warp Terminal" src=".assets/sponsers/warp.png" width="100%">
-</a>
+The Docker Compose setup persists app data in the named Docker volume `vane-data`.
 
-### **✨ [Try Warp - The AI-Powered Terminal →](https://www.warp.dev/vane)**
+### Option 2: Docker CLI
 
-Warp is revolutionizing development workflows with AI-powered features, modern UX, and blazing-fast performance. Used by developers at top companies worldwide.
-
-</div>
-
----
-
-We'd also like to thank the following partners for their generous support:
-
-<table>
-  <tr>
-    <td width="100" align="center">
-      <a href="https://dashboard.exa.ai" target="_blank">
-        <img src=".assets/sponsers/exa.png" alt="Exa" width="80" height="80" style="border-radius: .75rem;" />
-      </a>
-    </td>
-    <td>
-      <a href="https://dashboard.exa.ai">Exa</a> • The Perfect Web Search API for LLMs - web search, crawling, deep research, and answer APIs
-    </td>
-  </tr>
-</table>
-
-## Installation
-
-There are mainly 2 ways of installing Vane - With Docker, Without Docker. Using Docker is highly recommended.
-
-### Getting Started with Docker (Recommended)
-
-Vane can be easily run using Docker. Simply run the following command:
+Build the local Docker image:
 
 ```bash
-docker run -d -p 3000:3000 -v vane-data:/home/vane/data --name vane itzcrazykns1337/vane:latest
+docker build -t ai-search-dashboard .
 ```
 
-This will pull and start the Vane container with the bundled SearxNG search engine. Once running, open your browser and navigate to http://localhost:3000. You can then configure your settings (API keys, models, etc.) directly in the setup screen.
-
-**Note**: The image includes both Vane and SearxNG, so no additional setup is required. The `-v` flags create persistent volumes for your data and uploaded files.
-
-#### Using Vane with Your Own SearxNG Instance
-
-If you already have SearxNG running, you can use the slim version of Vane:
+Run the container:
 
 ```bash
-docker run -d -p 3000:3000 -e SEARXNG_API_URL=http://your-searxng-url:8080 -v vane-data:/home/vane/data --name vane itzcrazykns1337/vane:slim-latest
+docker run -d \
+  --name ai-search-dashboard \
+  -p 3000:3000 \
+  -e ADMIN_ANALYTICS_TOKEN=replace-with-a-long-random-secret \
+  -v ai-search-dashboard-data:/home/vane/data \
+  ai-search-dashboard
 ```
 
-**Important**: Make sure your SearxNG instance has:
+Open the app at:
 
-- JSON format enabled in the settings
-- Wolfram Alpha search engine enabled
+```text
+http://localhost:3000
+```
 
-Replace `http://your-searxng-url:8080` with your actual SearxNG URL. Then configure your AI provider settings in the setup screen at http://localhost:3000.
+View logs:
 
-#### Advanced Setup (Building from Source)
+```bash
+docker logs -f ai-search-dashboard
+```
 
-If you prefer to build from source or need more control:
+Stop and remove the container:
 
-1. Ensure Docker is installed and running on your system.
-2. Clone the Vane repository:
+```bash
+docker rm -f ai-search-dashboard
+```
 
-   ```bash
-   git clone https://github.com/ItzCrazyKns/Vane.git
-   ```
+The Docker CLI setup persists app data in the named Docker volume `ai-search-dashboard-data`.
 
-3. After cloning, navigate to the directory containing the project files.
+## Using Your Own SearxNG Instance
 
-4. Build and run using Docker:
+The bundled Docker image starts SearxNG inside the container and sets `SEARXNG_API_URL` to `http://localhost:8080` by default.
 
-   ```bash
-   docker build -t vane .
-   docker run -d -p 3000:3000 -v vane-data:/home/vane/data --name vane vane
-   ```
+If you want to use your own SearxNG instance instead, pass `SEARXNG_API_URL` when starting the container:
 
-5. Access Vane at http://localhost:3000 and configure your settings in the setup screen.
+```bash
+docker run -d \
+  --name ai-search-dashboard \
+  -p 3000:3000 \
+  -e ADMIN_ANALYTICS_TOKEN=replace-with-a-long-random-secret \
+  -e SEARXNG_API_URL=http://your-searxng-url:8080 \
+  -v ai-search-dashboard-data:/home/vane/data \
+  ai-search-dashboard
+```
 
-**Note**: After the containers are built, you can start Vane directly from Docker without having to open a terminal.
+Make sure your SearxNG instance has JSON output enabled.
 
-### Non-Docker Installation
+## Local Development Without Docker
 
-1. Install SearXNG and allow `JSON` format in the SearXNG settings. Make sure Wolfram Alpha search engine is also enabled.
-2. Clone the repository:
+Use Docker for deployment when possible. For local development without Docker:
 
-   ```bash
-   git clone https://github.com/ItzCrazyKns/Vane.git
-   cd Vane
-   ```
+```bash
+npm install
+npm run dev
+```
 
-3. Install dependencies:
+Then open:
 
-   ```bash
-   npm i
-   ```
+```text
+http://localhost:3000
+```
 
-4. Build the application:
+For a production-style local run without Docker:
 
-   ```bash
-   npm run build
-   ```
+```bash
+npm run build
+npm run start
+```
 
-5. Start the application:
+## First-Time Setup
 
-   ```bash
-   npm run start
-   ```
+After the app starts, open `http://localhost:3000` and complete setup in the browser.
 
-6. Open your browser and navigate to http://localhost:3000 to complete the setup and configure your settings (API keys, models, SearxNG URL, etc.) in the setup screen.
+You can configure:
 
-**Note**: Using Docker is recommended as it simplifies the setup process, especially for managing environment variables and dependencies.
+- AI provider connections and API keys.
+- Chat and embedding models.
+- Search settings.
+- Preferences and personalization.
 
-See the [installation documentation](https://github.com/ItzCrazyKns/Vane/tree/master/docs/installation) for more information like updating, etc.
+Do not commit or share real `.env` files, API keys, provider secrets, local databases, or uploaded files unless the recipient is supposed to receive that data.
 
-### Troubleshooting
+## Runtime Data
 
-#### Local OpenAI-API-Compliant Servers
+Runtime data is stored in the app data directory. In Docker, that directory is mounted at:
 
-If Vane tells you that you haven't configured any chat model providers, ensure that:
+```text
+/home/vane/data
+```
 
-1. Your server is running on `0.0.0.0` (not `127.0.0.1`) and on the same port you put in the API URL.
-2. You have specified the correct model name loaded by your local LLM server.
-3. You have specified the correct API key, or if one is not defined, you have put _something_ in the API key field and not left it empty.
+Depending on usage, runtime data can include:
 
-#### Ollama Connection Errors
+- App configuration.
+- Provider connection settings.
+- Chat history.
+- Query analytics.
+- Uploaded files and extracted document chunks.
 
-If you're encountering an Ollama connection error, it is likely due to the backend being unable to connect to Ollama's API. To fix this issue you can:
+When using Docker Compose, the data is stored in the `vane-data` Docker volume. When using the Docker CLI example above, it is stored in the `ai-search-dashboard-data` Docker volume.
 
-1. **Check your Ollama API URL:** Ensure that the API URL is correctly set in the settings menu.
-2. **Update API URL Based on OS:**
+## Useful Maintenance Commands
 
-   - **Windows:** Use `http://host.docker.internal:11434`
-   - **Mac:** Use `http://host.docker.internal:11434`
-   - **Linux:** Use `http://<private_ip_of_host>:11434`
+Rebuild and restart with Docker Compose:
 
-   Adjust the port number if you're using a different one.
+```bash
+docker compose up --build -d
+```
 
-3. **Linux Users - Expose Ollama to Network:**
+Restart the Docker Compose service:
 
-   - Inside `/etc/systemd/system/ollama.service`, you need to add `Environment="OLLAMA_HOST=0.0.0.0:11434"`. (Change the port number if you are using a different one.) Then reload the systemd manager configuration with `systemctl daemon-reload`, and restart Ollama by `systemctl restart ollama`. For more information see [Ollama docs](https://github.com/ollama/ollama/blob/main/docs/faq.md#setting-environment-variables-on-linux)
+```bash
+docker compose restart vane
+```
 
-   - Ensure that the port (default is 11434) is not blocked by your firewall.
+Remove the Docker Compose container but keep persistent data:
 
-#### OpenRouter
+```bash
+docker compose down
+```
 
-Add OpenRouter in Settings → Connections, paste your OpenRouter API key, and enter/select any OpenRouter model or router slug. Changing the model in settings switches models without code changes. OpenRouter uses the default OpenAI-compatible base URL `https://openrouter.ai/api/v1`; you can also configure the optional HTTP-Referer and X-Title headers in the connection settings.
+Remove the Docker Compose container and delete the persistent `vane-data` volume:
 
-#### Lemonade Connection Errors
+```bash
+docker compose down -v
+```
 
-If you're encountering a Lemonade connection error, it is likely due to the backend being unable to connect to Lemonade's API. To fix this issue you can:
-
-1. **Check your Lemonade API URL:** Ensure that the API URL is correctly set in the settings menu.
-2. **Update API URL Based on OS:**
-
-   - **Windows:** Use `http://host.docker.internal:8000`
-   - **Mac:** Use `http://host.docker.internal:8000`
-   - **Linux:** Use `http://<private_ip_of_host>:8000`
-
-   Adjust the port number if you're using a different one.
-
-3. **Ensure Lemonade Server is Running:**
-
-   - Make sure your Lemonade server is running and accessible on the configured port (default is 8000).
-   - Verify that Lemonade is configured to accept connections from all interfaces (`0.0.0.0`), not just localhost (`127.0.0.1`).
-   - Ensure that the port (default is 8000) is not blocked by your firewall.
-
-## Using as a Search Engine
-
-If you wish to use Vane as an alternative to traditional search engines like Google or Bing, or if you want to add a shortcut for quick access from your browser's search bar, follow these steps:
-
-1. Open your browser's settings.
-2. Navigate to the 'Search Engines' section.
-3. Add a new site search with the following URL: `http://localhost:3000/?q=%s`. Replace `localhost` with your IP address or domain name, and `3000` with the port number if Vane is not hosted locally.
-4. Click the add button. Now, you can use Vane directly from your browser's search bar.
-
-## Using Vane's API
-
-Vane also provides an API for developers looking to integrate its powerful search engine into their own applications. You can run searches, use multiple models and get answers to your queries.
-
-For more details, check out the full documentation [here](https://github.com/ItzCrazyKns/Vane/tree/master/docs/API/SEARCH.md).
-
-## Expose Vane to network
-
-Vane runs on Next.js and handles all API requests. It works right away on the same network and stays accessible even with port forwarding.
-
-## One-Click Deployment
-
-[![Deploy to Sealos](https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg)](https://usw.sealos.io/?openapp=system-template%3FtemplateName%3Dperplexica)
-[![Deploy to RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/?app_id=267)
-[![Run on ClawCloud](https://raw.githubusercontent.com/ClawCloud/Run-Template/refs/heads/main/Run-on-ClawCloud.svg)](https://template.run.claw.cloud/?referralCode=U11MRQ8U9RM4&openapp=system-fastdeploy%3FtemplateName%3Dperplexica)
-[![Deploy on Hostinger](https://assets.hostinger.com/vps/deploy.svg)](https://www.hostinger.com/vps/docker-hosting?compose_url=https://raw.githubusercontent.com/ItzCrazyKns/Vane/refs/heads/master/docker-compose.yaml)
-
-## Upcoming Features
-
-- [ ] Adding more widgets, integrations, search sources
-- [ ] Adding ability to create custom agents (name T.B.D.)
-- [ ] Adding authentication
-
-## Support Us
-
-If you find Vane useful, consider giving us a star on GitHub. This helps more people discover Vane and supports the development of new features. Your support is greatly appreciated.
-
-### Donations
-
-We also accept donations to help sustain our project. If you would like to contribute, you can use the following options to donate. Thank you for your support!
-
-| Ethereum                                              |
-| ----------------------------------------------------- |
-| Address: `0xB025a84b2F269570Eb8D4b05DEdaA41D8525B6DD` |
-
-## Contribution
-
-Vane is built on the idea that AI and large language models should be easy for everyone to use. If you find bugs or have ideas, please share them in via GitHub Issues. For more information on contributing to Vane you can read the [CONTRIBUTING.md](CONTRIBUTING.md) file to learn more about Vane and how you can contribute to it.
-
-## Help and Support
-
-If you have any questions or feedback, please feel free to reach out to us. You can create an issue on GitHub or join our Discord server. There, you can connect with other users, share your experiences and reviews, and receive more personalized help. [Click here](https://discord.gg/EFwsmQDgAu) to join the Discord server. To discuss matters outside of regular support, feel free to contact me on Discord at `itzcrazykns`.
-
-Thank you for exploring Vane, the AI-powered search engine designed to enhance your search experience. We are constantly working to improve Vane and expand its capabilities. We value your feedback and contributions which help us make Vane even better. Don't forget to check back for updates and new features!
+Only run `docker compose down -v` when you intentionally want to delete local runtime data.
